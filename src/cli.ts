@@ -80,13 +80,21 @@ program
 
 program
   .command("blind")
-  .description("blind self-test: can you tell your writing from the rewrite?")
+  .description(
+    "blind self-test: label replies yours/not-yours, then say why (reason codes)",
+  )
   .requiredOption("--generated <file>", "file of generated snippets")
   .option("--register <register>", "voice register", "technical-instruction")
-  .option("-n <n>", "snippets per side", (v: string) => parseInt(v, 10), 5)
-  .action(async (opts: { register: string; generated: string; n: number }) => {
-    process.exitCode = await runBlind(opts);
-  });
+  .addOption(
+    new Option("--unit <unit>", "labeling unit")
+      .choices(["reply", "paragraph"])
+      .default("reply"),
+  )
+  .action(
+    async (opts: { register: string; generated: string; unit: string }) => {
+      process.exitCode = await runBlind(opts);
+    },
+  );
 
 program
   .command("serve")
