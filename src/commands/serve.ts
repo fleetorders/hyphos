@@ -28,6 +28,7 @@ import {
 } from "./score.js";
 import { rewrite, judge } from "./rewrite.js";
 import { enforce } from "./rules.js";
+import { isoSeconds } from "./feedback.js";
 
 const TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -42,15 +43,6 @@ type Verdict = "good" | "fine" | "bad";
 
 function webDir(): string {
   return process.env.HYPHOS_WEB ?? path.join(process.cwd(), "web");
-}
-
-// Python datetime.now().isoformat(timespec="seconds"): local time, no timezone.
-function isoSeconds(d: Date): string {
-  const p = (x: number): string => String(x).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` +
-    `T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-  );
 }
 
 export interface FeedbackResult {
