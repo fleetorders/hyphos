@@ -11,13 +11,15 @@ your transcripts / exports
 corpus/raw-sessions.jsonl        — your own typed messages, deduplicated
         │  tag registers
         ▼
-profiles/<register>/             — two artifacts per register
+profiles/<register>/             — artifacts per register
         │   fingerprint.json     — computed stylometry: sentence-length
         │                          distribution, punctuation habits, casing,
         │                          openers/connectors, paragraph rhythm
         │   styleguide.md        — model-distilled guide: recurring structures,
         │                          quirks, anti-patterns; every claim cites
         │                          sample lines from the corpus
+        │   banned.json          — optional: words this register never uses,
+        │                          flagged by the deterministic pass
         ▼
 rewrite: draft + register profile
         │  1. model pass — rewrite prompt built from both profile artifacts
