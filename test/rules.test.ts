@@ -22,12 +22,12 @@ describe("rules self-test (D-003 deterministic enforcement)", () => {
     expect(rulesSelftest(false)).toBe(0);
   });
 
-  it("has the expected rule and test counts (9 rules, 11 tests)", () => {
+  it("has the expected rule and test counts (10 rules, 12 tests)", () => {
     const nTests =
       RULES.reduce((s, r) => s + (r.tests?.length ?? 0), 0) +
       PIPELINE_FIXTURES.length;
-    expect(RULES.length).toBe(9);
-    expect(nTests).toBe(11);
+    expect(RULES.length).toBe(10);
+    expect(nTests).toBe(12);
   });
 
   it("leaves em-dashes untouched (rewrite family dropped, D-011)", () => {
@@ -50,6 +50,110 @@ describe("rules self-test (D-003 deterministic enforcement)", () => {
     for (const fx of PIPELINE_FIXTURES) {
       const [out] = enforce(fx.in);
       expect(out).toBe(fx.out);
+    }
+  });
+});
+
+describe("banned words (rule class and per-register list)", () => {
+  const prevProfiles = process.env.HYPHOS_PROFILES;
+
+  const withProfiles = (mutate: (dir: string) => void): string => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-banned-test-"));
+    mutate(dir);
+    process.env.HYPHOS_PROFILES = dir;
+    return dir;
+  };
+
+  afterEach(() => {
+    if (prevProfiles === undefined) delete process.env.HYPHOS_PROFILES;
+    else process.env.HYPHOS_PROFILES = prevProfiles;
+  });
+
+  const banned = {
+    id: "banned-words",
+    kind: "banned" as const,
+    words: ["bundle"],
+  };
+
+  it("ships with an empty built-in list", () => {
+    const rule = RULES.find((r) => r.id === "banned-words");
+    expect(rule).toBeDefined();
+    expect(rule!.words).toEqual([]);
+    const [, report] = enforce("the bundle process works");
+    expect(report.flags["banned-words"]).toBeUndefined();
+  });
+
+  it("flags a banned word case-insensitively and leaves the text alone", () => {
+    const [out, n] = applyOne(banned, "the bundle process works");
+    expect(out).toBe("the bundle process works");
+    expect(n).toBe(1);
+    const [, capitalized] = applyOne(banned, "the Bundle process works");
+    expect(capitalized).toBe(1);
+  });
+
+  it("does not fire inside a larger word", () => {
+    const [, n] = applyOne(banned, "the bundles retired");
+    expect(n).toBe(0);
+  });
+
+  it("lets the personal overlay fill the built-in slot by id", () => {
+    const dir = withProfiles((d) => {
+      fs.writeFileSync(path.join(d, "rules.json"), JSON.stringify([banned]));
+    });
+    try {
+      const merged = loadRules();
+      expect(merged.length).toBe(RULES.length);
+      expect(merged.find((r) => r.id === "banned-words")!.words).toEqual([
+        "bundle",
+      ]);
+      const [, report] = enforce("the bundle process works");
+      expect(report.flags["banned-words"]).toBe(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("appends the register's banned.json as a banned rule", () => {
+    const dir = withProfiles((d) => {
+      fs.mkdirSync(path.join(d, "editorial"));
+      fs.writeFileSync(
+        path.join(d, "editorial", "banned.json"),
+        JSON.stringify(["bundle", "leverage"]),
+      );
+    });
+    try {
+      const merged = loadRules("editorial");
+      const rule = merged.find((r) => r.id === "banned-words-editorial");
+      expect(rule).toBeDefined();
+      expect(rule!.kind).toBe("banned");
+      expect(rule!.words).toEqual(["bundle", "leverage"]);
+      // the register list fires only when the register is named
+      const [, withReg] = enforce("let's leverage the bundle", "editorial");
+      expect(withReg.flags["banned-words-editorial"]).toBe(2);
+      const [, withoutReg] = enforce("let's leverage the bundle");
+      expect(withoutReg.flags["banned-words-editorial"]).toBeUndefined();
+      // no built-in seed word here
+      expect(withReg.flags["banned-words"]).toBeUndefined();
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores a missing or malformed register list", () => {
+    const dir = withProfiles(() => {}); // no banned.json anywhere
+    try {
+      expect(loadRules("editorial")).toEqual(loadRules());
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+    const bad = withProfiles((d) => {
+      fs.mkdirSync(path.join(d, "editorial"));
+      fs.writeFileSync(path.join(d, "editorial", "banned.json"), "{ not json");
+    });
+    try {
+      expect(loadRules("editorial")).toEqual(loadRules());
+    } finally {
+      fs.rmSync(bad, { recursive: true, force: true });
     }
   });
 });

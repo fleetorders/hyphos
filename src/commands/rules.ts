@@ -2,9 +2,10 @@
  * Deterministic quirk-enforcement engine (D-003: the post-model pass).
  *
  * Every content-adaptation operation is a declared rule with an id, a kind, a
- * regular-expression pattern, and its own test cases. The engine applies the
- * rules in listed order (deterministic), reports per-rule counts, and the
- * self-test verifies every rule against its cases. The built-in patterns and
+ * regular-expression pattern (a word list instead, for `banned` rules), and
+ * its own test cases. The engine applies the rules in listed order
+ * (deterministic), reports per-rule counts, and the self-test verifies every
+ * rule against its cases. The built-in patterns and
  * their order are stable, except the em-dash rewrite family (pair/single/tight),
  * dropped by maintainer ruling (D-011): dash usage is voice data, not
  * deterministic substitution.
@@ -22,7 +23,7 @@ import path from "node:path";
 import { profilesDir } from "../lib/paths.js";
 import { pyDumps } from "./pyjson.js";
 
-export type RuleKind = "remove" | "replace" | "flag";
+export type RuleKind = "remove" | "replace" | "flag" | "banned";
 
 export interface RuleTest {
   in: string;
@@ -33,8 +34,10 @@ export interface RuleTest {
 export interface Rule {
   id: string;
   kind: RuleKind;
-  pattern: string;
+  pattern?: string;
   replacement?: string;
+  /** `banned` rules only: whole words this voice never uses (case-insensitive). */
+  words?: string[];
   tests?: RuleTest[];
 }
 
@@ -110,6 +113,19 @@ export const RULES: Rule[] = [
     pattern: "\\*\\*[^*\\n]{1,30}\\*\\*",
     tests: [{ in: "the **key** point", flags: 1 }],
   },
+  {
+    // Banned words: whole words a voice never uses. The built-in list ships
+    // EMPTY on purpose — which words a writer avoids is personal, not a
+    // model-ism, so nothing belongs here. The personal overlay
+    // (profiles/rules.json) fills this slot by overriding the id; a register
+    // extends it via profiles/<register>/banned.json (see loadRules).
+    // Flag-only — amputating a mid-sentence occurrence mangles meaning, the
+    // same lesson as flattery-standalone above.
+    id: "banned-words",
+    kind: "banned",
+    words: [],
+    tests: [{ in: "nothing is banned out of the box", flags: 0 }],
+  },
 ];
 
 // Whole-pipeline fixtures: exercise `enforce` end to end, not one rule.
@@ -129,9 +145,12 @@ export const PIPELINE_FIXTURES: { in: string; out: string }[] = [
  * them has already rewritten. Entries with new ids append after the built-ins.
  * A malformed or unreadable overlay is ignored (silent fallback to the
  * built-ins). Override-by-id extends the plain append-only merge;
- * without an overlay the loaded list is the built-ins.
+ * without an overlay the loaded list is the built-ins. With a `register`,
+ * a `profiles/<register>/banned.json` word list (one word per entry)
+ * appends a register-specific `banned-words-<register>` rule last; a
+ * missing or malformed file is ignored the same way.
  */
-export function loadRules(): Rule[] {
+export function loadRules(register?: string): Rule[] {
   const rules = [...RULES];
   const overlay = path.join(profilesDir(), "rules.json");
   try {
@@ -145,6 +164,25 @@ export function loadRules(): Rule[] {
     }
   } catch {
     // missing or invalid overlay — keep the built-ins only
+  }
+  if (register) {
+    try {
+      const list = path.join(profilesDir(), register, "banned.json");
+      const words = JSON.parse(fs.readFileSync(list, "utf8")) as unknown;
+      if (
+        Array.isArray(words) &&
+        words.length > 0 &&
+        words.every((w) => typeof w === "string" && w.length > 0)
+      ) {
+        rules.push({
+          id: `banned-words-${register}`,
+          kind: "banned",
+          words: words as string[],
+        });
+      }
+    } catch {
+      // no banned-word list for this register — keep the rules above only
+    }
   }
   return rules;
 }
@@ -206,25 +244,47 @@ function subn(re: RegExp, replacement: string, text: string): [string, number] {
   return [out, count];
 }
 
-/** Apply one rule. Returns [text, count]; `flag` rules leave text unchanged. */
+// Escape a literal word for embedding in a regular expression.
+function escapeRe(word: string): string {
+  return word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Apply one rule. Returns [text, count]; `flag`/`banned` rules leave text
+ * unchanged.
+ */
 export function applyOne(rule: Rule, text: string): [string, number] {
+  if (rule.kind === "banned") {
+    // Whole words, case-insensitive. The list is literals, so each entry is
+    // escaped before compilation; a plural or compound is a different word
+    // and does not fire — the word boundary is the point.
+    const words = (rule.words ?? []).map(escapeRe);
+    if (words.length === 0) return [text, 0];
+    const re = new RegExp(`\\b(?:${words.join("|")})\\b`, "gi");
+    const matches = text.match(re);
+    return [text, matches ? matches.length : 0];
+  }
   if (rule.kind === "remove")
-    return subn(new RegExp(rule.pattern, "g"), "", text);
+    return subn(new RegExp(rule.pattern!, "g"), "", text);
   if (rule.kind === "replace")
-    return subn(new RegExp(rule.pattern, "g"), rule.replacement ?? "", text);
-  const matches = text.match(new RegExp(rule.pattern, "gi"));
+    return subn(new RegExp(rule.pattern!, "g"), rule.replacement ?? "", text);
+  const matches = text.match(new RegExp(rule.pattern!, "gi"));
   return [text, matches ? matches.length : 0];
 }
 
 /**
  * Run the full deterministic pass: apply the remove/replace rules (recording
- * counts), tally the flag rules, then collapse runs of 2+ spaces/tabs. Returns
- * the cleaned text and a report of what fired.
+ * counts), tally the flag and banned rules, then collapse runs of 2+
+ * spaces/tabs. With a `register`, that register's banned-word list joins the
+ * pass. Returns the cleaned text and a report of what fired.
  */
-export function enforce(text: string): [string, EnforceReport] {
+export function enforce(
+  text: string,
+  register?: string,
+): [string, EnforceReport] {
   const report: EnforceReport = { applied: {}, flags: {} };
-  for (const rule of loadRules()) {
-    if (rule.kind === "flag") {
+  for (const rule of loadRules(register)) {
+    if (rule.kind === "flag" || rule.kind === "banned") {
       const [, n] = applyOne(rule, text);
       if (n) report.flags[rule.id] = n;
     } else {
@@ -314,16 +374,15 @@ export function runRules(opts: { test?: boolean } = {}): number {
 
 /**
  * `enforce` subcommand: run the deterministic pass on a file, write the result
- * to stdout (no trailing newline) and the report to
- * stderr. The `--register` flag is accepted for symmetry but unused (enforcement
- * is register-independent). Returns an exit code.
+ * to stdout (no trailing newline) and the report to stderr. `--register` adds
+ * that register's banned-word list to the pass. Returns an exit code.
  */
 export function runEnforce(
   file: string,
-  _opts: { register?: string } = {},
+  opts: { register?: string } = {},
 ): number {
   const text = fs.readFileSync(file, "utf8");
-  const [out, report] = enforce(text);
+  const [out, report] = enforce(text, opts.register);
   process.stdout.write(out);
   process.stderr.write(
     "\n== enforcement ==\n" + pyDumps(report, { indent: 1 }) + "\n",

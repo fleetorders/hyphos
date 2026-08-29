@@ -181,7 +181,7 @@ async function handlePost(
         score: sc,
       });
     } else if (route === "/api/enforce") {
-      const [out, rep] = enforce(text);
+      const [out, rep] = enforce(text, register0);
       sendJson(res, 200, { text: out, enforcement: rep });
     } else if (route === "/api/score") {
       sendJson(res, 200, score(text, register0));

@@ -249,7 +249,7 @@ export async function rewrite(
     try {
       const out =
         b === "claude" ? callClaudeCli(prompt) : await callApi(prompt);
-      const [final, report] = enforce(out);
+      const [final, report] = enforce(out, register);
       let finalText = final;
       if (typos === "natural") {
         const [t, n] = injectTypos(finalText, register);
