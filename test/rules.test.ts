@@ -22,12 +22,12 @@ describe("rules self-test (D-003 deterministic enforcement)", () => {
     expect(rulesSelftest(false)).toBe(0);
   });
 
-  it("has the expected rule and test counts (10 rules, 14 tests)", () => {
+  it("has the expected rule and test counts (10 rules, 12 tests)", () => {
     const nTests =
       RULES.reduce((s, r) => s + (r.tests?.length ?? 0), 0) +
       PIPELINE_FIXTURES.length;
     expect(RULES.length).toBe(10);
-    expect(nTests).toBe(14);
+    expect(nTests).toBe(12);
   });
 
   it("leaves em-dashes untouched (rewrite family dropped, D-011)", () => {
@@ -69,17 +69,48 @@ describe("banned words (rule class and per-register list)", () => {
     else process.env.HYPHOS_PROFILES = prevProfiles;
   });
 
+  const banned = {
+    id: "banned-words",
+    kind: "banned" as const,
+    words: ["bundle"],
+  };
+
+  it("ships with an empty built-in list", () => {
+    const rule = RULES.find((r) => r.id === "banned-words");
+    expect(rule).toBeDefined();
+    expect(rule!.words).toEqual([]);
+    const [, report] = enforce("the bundle process works");
+    expect(report.flags["banned-words"]).toBeUndefined();
+  });
+
   it("flags a banned word case-insensitively and leaves the text alone", () => {
-    const [out, report] = enforce("the sidecar process works");
-    expect(out).toBe("the sidecar process works");
-    expect(report.flags["banned-words"]).toBe(1);
-    const [, capitalized] = enforce("the Sidecar process works");
-    expect(capitalized.flags["banned-words"]).toBe(1);
+    const [out, n] = applyOne(banned, "the bundle process works");
+    expect(out).toBe("the bundle process works");
+    expect(n).toBe(1);
+    const [, capitalized] = applyOne(banned, "the Bundle process works");
+    expect(capitalized).toBe(1);
   });
 
   it("does not fire inside a larger word", () => {
-    const [, report] = enforce("the sidecars retired");
-    expect(report.flags["banned-words"]).toBeUndefined();
+    const [, n] = applyOne(banned, "the bundles retired");
+    expect(n).toBe(0);
+  });
+
+  it("lets the personal overlay fill the built-in slot by id", () => {
+    const dir = withProfiles((d) => {
+      fs.writeFileSync(path.join(d, "rules.json"), JSON.stringify([banned]));
+    });
+    try {
+      const merged = loadRules();
+      expect(merged.length).toBe(RULES.length);
+      expect(merged.find((r) => r.id === "banned-words")!.words).toEqual([
+        "bundle",
+      ]);
+      const [, report] = enforce("the bundle process works");
+      expect(report.flags["banned-words"]).toBe(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("appends the register's banned.json as a banned rule", () => {

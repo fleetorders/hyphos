@@ -243,3 +243,39 @@ not the project's origin.
 **Why:** a public project should read as one implementation with one history,
 not as half of a comparison; the transition's scaffolding had no job left
 once its last verification duty was discharged.
+
+### D-014 — The built-in banned-words list ships empty; personal words live outside the repo
+
+**Scope:** repo · **Decided:** 2026-08-29
+
+The `banned` rule class stays in the public engine, but its built-in word
+list is empty. Which words a writer avoids is a personal choice, not a
+model-ism, so no seed word belongs in the shipped source: the personal
+overlay (`profiles/rules.json`, overriding the `banned-words` id) carries
+the register-independent list, and `profiles/<register>/banned.json` extends
+it per register — both machine-local and gitignored, like every other
+profile artifact. The nightly batch of 2026-08-29 had seeded the built-in
+list with the maintainer's own first banned word; it was moved out before
+the batch merged.
+
+**Why:** the engine is public; a maintainer's personal vocabulary ruling in
+its source is the same category error as committing the corpus. The
+mechanism is the product, the word is data.
+
+### D-015 — Public comment replies stay voice-matched by imitation, unscored
+
+**Scope:** repo · **Decided:** 2026-08-29
+
+No `public-comment` register is built. Replies the maintainer posts on
+syndicated threads (dev.to and the like) keep the standing practice: drafted
+by imitation of his live replies, not rewritten through the engine and not
+scored. The `informal` register was tried and rejected for this text shape —
+its chat fingerprint lowercases sentence starts, which the live replies never
+do — and none of the existing registers fits. The cited replies are not in
+the corpus, so the bucket could not be fingerprinted from in-repo data; the
+question was put to the maintainer and dropped rather than deferred.
+
+**Why:** a register needs a tagged corpus slice plus a model-distilled
+styleguide; without the raw thread exports there is nothing to build from,
+and a fingerprint-only profile would give a score with no rewrite guidance.
+The practice already in place is the codified answer.

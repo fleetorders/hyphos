@@ -114,18 +114,17 @@ export const RULES: Rule[] = [
     tests: [{ in: "the **key** point", flags: 1 }],
   },
   {
-    // Banned words: words this voice never uses, seeded with "sidecar".
+    // Banned words: whole words a voice never uses. The built-in list ships
+    // EMPTY on purpose — which words a writer avoids is personal, not a
+    // model-ism, so nothing belongs here. The personal overlay
+    // (profiles/rules.json) fills this slot by overriding the id; a register
+    // extends it via profiles/<register>/banned.json (see loadRules).
     // Flag-only — amputating a mid-sentence occurrence mangles meaning, the
-    // same lesson as flattery-standalone above. Registers extend the list
-    // via profiles/<register>/banned.json (see loadRules).
+    // same lesson as flattery-standalone above.
     id: "banned-words",
     kind: "banned",
-    words: ["sidecar"],
-    tests: [
-      { in: "the sidecar process works", flags: 1 },
-      { in: "the Sidecar process works", flags: 1 },
-      { in: "the sidecars retired", flags: 0 },
-    ],
+    words: [],
+    tests: [{ in: "nothing is banned out of the box", flags: 0 }],
   },
 ];
 
@@ -257,8 +256,8 @@ function escapeRe(word: string): string {
 export function applyOne(rule: Rule, text: string): [string, number] {
   if (rule.kind === "banned") {
     // Whole words, case-insensitive. The list is literals, so each entry is
-    // escaped before compilation; a plural or compound ("sidecars") is a
-    // different word and does not fire — the word boundary is the point.
+    // escaped before compilation; a plural or compound is a different word
+    // and does not fire — the word boundary is the point.
     const words = (rule.words ?? []).map(escapeRe);
     if (words.length === 0) return [text, 0];
     const re = new RegExp(`\\b(?:${words.join("|")})\\b`, "gi");
