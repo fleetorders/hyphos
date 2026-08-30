@@ -1,11 +1,11 @@
 # hyphos
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/triartleet/hyphos/main/media/hyphos-logo.png" width="520" alt="hyphos — a pen nib tracing a personal signature waveform, the shape of one writer's voice">
+  <img src="https://raw.githubusercontent.com/fleetorders/hyphos/main/media/hyphos-logo.png" width="520" alt="hyphos — a pen nib tracing a personal signature waveform, the shape of one writer's voice">
   <p>
     <a href="https://www.npmjs.com/package/hyphos"><img src="https://img.shields.io/npm/v/hyphos.svg?label=npm&color=cb3837" alt="npm version"></a>
-    <a href="https://github.com/triartleet/hyphos/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/triartleet/hyphos/ci.yml?branch=main&label=CI" alt="CI"></a>
-    <a href="https://github.com/triartleet/hyphos/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+    <a href="https://github.com/fleetorders/hyphos/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/fleetorders/hyphos/ci.yml?branch=main&label=CI" alt="CI"></a>
+    <a href="https://github.com/fleetorders/hyphos/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
   </p>
 </div>
 
