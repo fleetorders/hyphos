@@ -34,6 +34,14 @@
     "local-first"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fleetorders/hyphos.git"
+  },
+  "homepage": "https://github.com/fleetorders/hyphos#readme",
+  "bugs": {
+    "url": "https://github.com/fleetorders/hyphos/issues"
+  },
   "engines": {
     "node": ">=18.17"
   },
