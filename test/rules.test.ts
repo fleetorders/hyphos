@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   RULES,
   PIPELINE_FIXTURES,
+  GUARD_FIXTURES,
   applyOne,
   enforce,
   loadRules,
@@ -155,6 +156,99 @@ describe("banned words (rule class and per-register list)", () => {
     } finally {
       fs.rmSync(bad, { recursive: true, force: true });
     }
+  });
+});
+
+describe("banned tokens (non-word marks — the em-dash surface, D-016)", () => {
+  // U+2014 EM DASH — the mark that cannot fire under \b, hence the token mode.
+  const dashes = { id: "banned-words", kind: "banned" as const, tokens: ["—"] };
+
+  it("flags an em-dash (U+2014) without word boundaries", () => {
+    const [out, n] = applyOne(dashes, "a — b — c");
+    expect(out).toBe("a — b — c");
+    expect(n).toBe(2);
+    // glued to words it still fires — no \b around a token
+    const [, glued] = applyOne(dashes, "word—word");
+    expect(glued).toBe(1);
+  });
+
+  it("flags an en-dash (U+2013) the same way", () => {
+    const [, n] = applyOne(
+      { id: "banned-words", kind: "banned", tokens: ["–"] },
+      "2020–2022",
+    );
+    expect(n).toBe(1);
+  });
+
+  it("sums words and tokens in one rule", () => {
+    const [, n] = applyOne(
+      { id: "banned-words", kind: "banned", words: ["bundle"], tokens: ["—"] },
+      "the bundle — works",
+    );
+    expect(n).toBe(2);
+  });
+
+  it("carries tokens in the personal overlay to every register", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-banned-test-"));
+    fs.writeFileSync(
+      path.join(dir, "rules.json"),
+      JSON.stringify([{ id: "banned-words", kind: "banned", tokens: ["—"] }]),
+    );
+    process.env.HYPHOS_PROFILES = dir;
+    try {
+      // no register named: the overlay is register-independent
+      const [, plain] = enforce("a — b");
+      expect(plain.flags["banned-words"]).toBe(1);
+      // any register: same single source, no per-register copy
+      for (const register of [
+        "editorial",
+        "technical-instruction",
+        "informal",
+      ]) {
+        const [, withReg] = enforce("a — b", register);
+        expect(withReg.flags["banned-words"]).toBe(1);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      delete process.env.HYPHOS_PROFILES;
+    }
+  });
+});
+
+describe("empty and zero-width patterns are inert (length+1 regression)", () => {
+  // A rule whose compiled pattern matches the empty string fires at EVERY
+  // position — count = text length + 1 — so such a rule must fire on nothing.
+  const text = "Five words and a stop.";
+
+  it("makes every guard fixture fire on nothing and change nothing", () => {
+    for (const rule of GUARD_FIXTURES) {
+      const [out, n] = applyOne(rule, text);
+      expect(n, rule.id).toBe(0);
+      expect(out, rule.id).toBe(text);
+    }
+  });
+
+  it("carries the guards in the self-test", () => {
+    // rulesSelftest(false) === 0 is asserted above; the guards it runs must
+    // include the banned empty-pattern cases, or the class can return.
+    expect(GUARD_FIXTURES.some((r) => r.kind === "banned")).toBe(true);
+    expect(
+      GUARD_FIXTURES.filter((r) => r.kind === "banned").length,
+    ).toBeGreaterThanOrEqual(3);
+  });
+
+  it("does not count a zero-width flag pattern (x* matches everywhere)", () => {
+    const [, n] = applyOne({ id: "z", kind: "flag", pattern: "x*" }, text);
+    expect(n).toBe(0);
+  });
+
+  it("does not substitute an empty-branch remove pattern", () => {
+    const [out, n] = applyOne(
+      { id: "z", kind: "remove", pattern: "(?:)|ship" },
+      text,
+    );
+    expect(out).toBe(text);
+    expect(n).toBe(0);
   });
 });
 

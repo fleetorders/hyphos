@@ -2,13 +2,15 @@
  * Deterministic quirk-enforcement engine (D-003: the post-model pass).
  *
  * Every content-adaptation operation is a declared rule with an id, a kind, a
- * regular-expression pattern (a word list instead, for `banned` rules), and
- * its own test cases. The engine applies the rules in listed order
+ * regular-expression pattern (word/token lists instead, for `banned` rules),
+ * and its own test cases. The engine applies the rules in listed order
  * (deterministic), reports per-rule counts, and the self-test verifies every
  * rule against its cases. The built-in patterns and
  * their order are stable, except the em-dash rewrite family (pair/single/tight),
  * dropped by maintainer ruling (D-011): dash usage is voice data, not
- * deterministic substitution.
+ * deterministic substitution — the banned surface may still FLAG a dash
+ * (D-016); it never rewrites one. A rule whose pattern is missing, empty, or
+ * zero-width is inert (see matchesEmpty below).
  *
  * Regex semantics match Python's `re`:
  *  - `remove`/`replace` rules run case-sensitively (Python uses `re.subn` with no
@@ -38,6 +40,12 @@ export interface Rule {
   replacement?: string;
   /** `banned` rules only: whole words this voice never uses (case-insensitive). */
   words?: string[];
+  /**
+   * `banned` rules only: literal marks this voice never uses, matched as-is
+   * with no word boundaries (case-sensitive) — for tokens that are not words,
+   * like an em-dash, which `\b` can never bracket.
+   */
+  tokens?: string[];
   tests?: RuleTest[];
 }
 
@@ -117,8 +125,10 @@ export const RULES: Rule[] = [
     // Banned words: whole words a voice never uses. The built-in list ships
     // EMPTY on purpose — which words a writer avoids is personal, not a
     // model-ism, so nothing belongs here. The personal overlay
-    // (profiles/rules.json) fills this slot by overriding the id; a register
-    // extends it via profiles/<register>/banned.json (see loadRules).
+    // (profiles/rules.json) fills this slot by overriding the id — with
+    // `words`, and with `tokens` for non-word marks (the em-dash, D-016),
+    // carried once there for every register; a register extends the WORDS
+    // via profiles/<register>/banned.json (see loadRules).
     // Flag-only — amputating a mid-sentence occurrence mangles meaning, the
     // same lesson as flattery-standalone above.
     id: "banned-words",
@@ -135,6 +145,26 @@ export const RULES: Rule[] = [
 // the fixture pins that dashes pass through the deterministic pass untouched.
 export const PIPELINE_FIXTURES: { in: string; out: string }[] = [
   { in: "Importantly, this — mostly — works.", out: "this — mostly — works." },
+];
+
+// The input every guard fixture runs against.
+const GUARD_INPUT = "Five words and a stop.";
+
+/**
+ * Rules that must be INERT: each carries an empty, missing, or zero-width
+ * pattern — the class that, unguarded, compiles to a regex matching the
+ * empty string and fires at every position (count = length + 1). The
+ * self-test asserts every guard fires on nothing and changes nothing, so
+ * the class cannot return unnoticed.
+ */
+export const GUARD_FIXTURES: Rule[] = [
+  { id: "guard-banned-empty-list", kind: "banned", words: [] },
+  { id: "guard-banned-empty-word", kind: "banned", words: [""] },
+  { id: "guard-banned-empty-token", kind: "banned", tokens: [""] },
+  { id: "guard-flag-missing-pattern", kind: "flag" },
+  { id: "guard-remove-empty-pattern", kind: "remove", pattern: "" },
+  { id: "guard-flag-zero-width", kind: "flag", pattern: "x*" },
+  { id: "guard-remove-empty-branch", kind: "remove", pattern: "(?:)|ship" },
 ];
 
 /**
@@ -249,27 +279,61 @@ function escapeRe(word: string): string {
   return word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// A pattern that can match the empty string — a missing `pattern` field, an
+// empty word entry, a zero-width regex like `x*` — compiles to a global
+// regex that fires at EVERY position of the text, so the rule's count
+// becomes the text's length + 1 while the text itself stays unchanged (the
+// regression of 2026-08-31: a banned-words entry from a newer overlay,
+// running on an engine without the `banned` kind, fell through to
+// `new RegExp(undefined)`). Such a rule is inert: it fires on nothing
+// rather than on everything. The guard cases in GUARD_FIXTURES pin this.
+function matchesEmpty(re: RegExp): boolean {
+  return new RegExp(re.source, re.flags.replace("g", "")).test("");
+}
+
+function countMatches(re: RegExp, text: string): number {
+  if (matchesEmpty(re)) return 0;
+  const matches = text.match(re);
+  return matches ? matches.length : 0;
+}
+
 /**
  * Apply one rule. Returns [text, count]; `flag`/`banned` rules leave text
- * unchanged.
+ * unchanged. A rule whose pattern is missing, empty, or zero-width is inert
+ * (count 0, text unchanged).
  */
 export function applyOne(rule: Rule, text: string): [string, number] {
   if (rule.kind === "banned") {
-    // Whole words, case-insensitive. The list is literals, so each entry is
-    // escaped before compilation; a plural or compound is a different word
-    // and does not fire — the word boundary is the point.
-    const words = (rule.words ?? []).map(escapeRe);
-    if (words.length === 0) return [text, 0];
-    const re = new RegExp(`\\b(?:${words.join("|")})\\b`, "gi");
-    const matches = text.match(re);
-    return [text, matches ? matches.length : 0];
+    // Words: whole words, case-insensitive. The list is literals, so each
+    // entry is escaped before compilation; a plural or compound is a
+    // different word and does not fire — the word boundary is the point.
+    // Tokens: the same, minus the boundaries — literal marks (an em-dash),
+    // case-sensitive. Empty entries are dropped before compilation: an empty
+    // branch in the alternation is the zero-width class above.
+    let n = 0;
+    const words = (rule.words ?? []).filter((w) => w.length > 0).map(escapeRe);
+    if (words.length > 0)
+      n += countMatches(new RegExp(`\\b(?:${words.join("|")})\\b`, "gi"), text);
+    const tokens = (rule.tokens ?? [])
+      .filter((t) => t.length > 0)
+      .map(escapeRe);
+    if (tokens.length > 0)
+      n += countMatches(new RegExp(tokens.join("|"), "g"), text);
+    return [text, n];
   }
-  if (rule.kind === "remove")
-    return subn(new RegExp(rule.pattern!, "g"), "", text);
-  if (rule.kind === "replace")
-    return subn(new RegExp(rule.pattern!, "g"), rule.replacement ?? "", text);
-  const matches = text.match(new RegExp(rule.pattern!, "gi"));
-  return [text, matches ? matches.length : 0];
+  // A missing or empty pattern compiles to /(?:)/ — inert, per the guard.
+  if (!rule.pattern) return [text, 0];
+  if (rule.kind === "remove") {
+    const re = new RegExp(rule.pattern, "g");
+    return matchesEmpty(re) ? [text, 0] : subn(re, "", text);
+  }
+  if (rule.kind === "replace") {
+    const re = new RegExp(rule.pattern, "g");
+    return matchesEmpty(re)
+      ? [text, 0]
+      : subn(re, rule.replacement ?? "", text);
+  }
+  return [text, countMatches(new RegExp(rule.pattern, "gi"), text)];
 }
 
 /**
@@ -347,12 +411,23 @@ export function rulesSelftest(verbose = true): number {
       );
     }
   }
+  for (const rule of GUARD_FIXTURES) {
+    const [out, n] = applyOne(rule, GUARD_INPUT);
+    if (n !== 0 || out !== GUARD_INPUT) {
+      failures++;
+      console.log(
+        `FAIL guard ${rule.id}: fired ${n} time(s) — an empty or zero-width pattern must be inert`,
+      );
+    }
+  }
   if (verbose) {
     const nRules = rules.length;
     const nTests =
       rules.reduce((s, r) => s + (r.tests?.length ?? 0), 0) +
       PIPELINE_FIXTURES.length;
-    console.log(`${nRules} rules, ${nTests} tests, ${failures} failure(s)`);
+    console.log(
+      `${nRules} rules, ${nTests} tests, ${GUARD_FIXTURES.length} guard(s), ${failures} failure(s)`,
+    );
   }
   return failures;
 }
