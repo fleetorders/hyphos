@@ -279,3 +279,28 @@ question was put to the maintainer and dropped rather than deferred.
 styleguide; without the raw thread exports there is nothing to build from,
 and a fingerprint-only profile would give a score with no rewrite guidance.
 The practice already in place is the codified answer.
+
+### D-016 — The em-dash is a banned token: flagged everywhere, replaced per instance by the rewriter
+
+**Scope:** repo · **Decided:** 2026-08-30
+
+The banned rule class gains a token mode: `tokens` are literal marks matched
+without word boundaries and case-sensitively — for tokens that are not
+words, like the em-dash, which `\b` can never bracket. Maintainer ruling of
+2026-08-30: no em-dash (U+2014), nor en-dash (U+2013) used as a dash, in
+anything the engine rewrites. The tokens live ONCE in the register-independent
+personal overlay (`profiles/rules.json`), so every register flags them and no
+per-register copy exists; the built-in list stays empty (D-014 — the
+mechanism is the product, the tokens are data). D-011 stands, with its
+meaning sharpened: the deterministic pass still never rewrites a dash, but
+the reason is now that the replacement is CHOSEN — colon, comma, semicolon,
+or a new sentence, per instance, a range becoming "from X to Y" — never one
+blanket swap. The rewrite prompt's negative lexicon carries that guidance;
+the enforce pass counts what survives.
+
+**Why:** a ban without a counter cannot be enforced, and a counter without
+per-instance choice produces blanket-substituted text that fails the fidelity
+score anyway. Splitting flag (deterministic) from replacement (model-chosen)
+gives each half the job it is good at; the zero-width guard added the same
+night (empty or missing patterns are inert, not length+1 hits) keeps the
+count itself trustworthy.
