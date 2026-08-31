@@ -1,6 +1,6 @@
 {
   "name": "hyphos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Rewrite any AI draft so it reads as written by you — register-aware voice profiles built from your own writing, with deterministic quirk enforcement and a fidelity score.",
   "type": "module",
   "bin": {
