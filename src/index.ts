@@ -48,6 +48,9 @@ export {
   callClaudeCli,
   callApi,
   runRewrite,
+  backendRefusal,
+  BACKEND_ENV,
+  BACKEND_ROLE,
 } from "./commands/rewrite.js";
 
 // Blind self-test.
