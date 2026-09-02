@@ -9,3 +9,6 @@ dist/
 
 # human drafts written beside the CLI (rewrite runs from this cwd); never tracked, never formatted
 .tmp-*
+
+# local-only tooling: never tracked, never published
+local/

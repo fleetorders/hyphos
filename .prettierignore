@@ -1,3 +1,4 @@
 dist/
 .etymd/
 .tmp-*
+local/
