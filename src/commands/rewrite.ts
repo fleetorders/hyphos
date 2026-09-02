@@ -31,9 +31,28 @@ function readTextIfFile(p: string): string | null {
   return null;
 }
 
+/**
+ * The register's distilled style guide, or a refusal.
+ *
+ * A register can be scored from its fingerprint alone, but nothing can be
+ * written IN a voice without a description of it. When the guide was merely
+ * skipped, the prompt still formed and the model still answered — it just
+ * answered in nobody's voice, and the only way to notice was to read the
+ * output and be disappointed. Refusing names the gap instead.
+ */
+function styleGuide(register: string): string {
+  const g = readTextIfFile(path.join(profilesDir(), register, "styleguide.md"));
+  if (g === null) {
+    throw new SysExit(
+      `register "${register}" has no styleguide.md, so a rewrite would not be ` +
+        `in your voice. Registers without one can be scored but not rewritten.`,
+    );
+  }
+  return g;
+}
+
 /** Compose the rewrite prompt from the register's style guide and anti-patterns. */
 export function buildPrompt(register: string, draft: string): string {
-  const guide = path.join(profilesDir(), register, "styleguide.md");
   const isms = path.join(profilesDir(), "model-isms.md");
   const parts = [
     "Rewrite the draft below so it reads as written by the person",
@@ -41,8 +60,7 @@ export function buildPrompt(register: string, draft: string): string {
     "Match the register exactly; keep protected quirks; remove every",
     "anti-pattern. Output ONLY the rewritten text.\n",
   ];
-  const g = readTextIfFile(guide);
-  if (g !== null) parts.push("== STYLE GUIDE ==", g);
+  parts.push("== STYLE GUIDE ==", styleGuide(register));
   const im = readTextIfFile(isms);
   if (im !== null) parts.push("== ANTI-PATTERNS (never produce these) ==", im);
   parts.push("== DRAFT ==", draft);
@@ -105,8 +123,10 @@ export async function judge(
   register: string,
   backend = "auto",
 ): Promise<Record<string, unknown>> {
-  const guide = path.join(profilesDir(), register, "styleguide.md");
   const isms = path.join(profilesDir(), "model-isms.md");
+  // Refuse for the same reason a rewrite refuses: judging a voice against a
+  // guide that says "(missing)" returns confident numbers about nothing.
+  const guideText = styleGuide(register);
   const prompt = [
     "You are judging whether the TEXT below reads as written by the",
     "specific person described in the STYLE GUIDE, in that register.",
@@ -120,7 +140,7 @@ export async function judge(
     '"overall":N,"evidence":["...","..."]}',
     "",
     "== STYLE GUIDE ==",
-    readTextIfFile(guide) ?? "(missing)",
+    guideText,
     "== ANTI-PATTERNS ==",
     readTextIfFile(isms) ?? "(missing)",
     "== TEXT ==",

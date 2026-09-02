@@ -203,6 +203,10 @@ export interface RegisterInfo {
   register: string;
   words: number;
   confidence: string;
+  /** Whether the register can be rewritten through, not merely scored against.
+   *  A fingerprint is enough to measure a draft; putting words in the author's
+   *  voice needs the distilled style guide as well. */
+  rewritable: boolean;
   hint: string | null;
 }
 
@@ -240,12 +244,20 @@ export function registersInfo(): RegisterInfo[] {
     const data = JSON.parse(fs.readFileSync(fp, "utf8")) as { words?: number };
     const words = data.words ?? 0;
     const conf = words >= 30000 ? "high" : words >= 8000 ? "medium" : "low";
+    let rewritable = false;
+    try {
+      rewritable = fs.statSync(path.join(dir, "styleguide.md")).isFile();
+    } catch {
+      rewritable = false;
+    }
     out.push({
       register: name,
       words,
       confidence: conf,
-      hint:
-        conf !== "low"
+      rewritable,
+      hint: !rewritable
+        ? "no style guide — this register can be scored but not rewritten"
+        : conf !== "low"
           ? null
           : "low sampling — add source material to sharpen this voice",
     });
