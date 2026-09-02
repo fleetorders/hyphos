@@ -6,3 +6,6 @@ dist/
 .env
 .DS_Store
 .etymd/cache/
+
+# human drafts written beside the CLI (rewrite runs from this cwd); never tracked, never formatted
+.tmp-*
