@@ -57,7 +57,10 @@ npx hyphos rules --test       # self-test the deterministic enforcement rules
 Corpus output lands in `corpus/` and profiles in `profiles/` under the
 package root (resolved from the CLI's own location, so commands work from any
 directory); point `HYPHOS_HOME` at another location to relocate both, or
-`HYPHOS_CORPUS` / `HYPHOS_PROFILES` to override one. Stdout
+`HYPHOS_CORPUS` / `HYPHOS_PROFILES` to override one. `HYPHOS_BACKEND` is
+reserved: the claude-CLI model backend sets it on its child, and a hyphos
+started under it refuses to run — an agentic backend told to route prose
+through hyphos would otherwise re-invoke the tool on its own input. Stdout
 prints aggregate numbers only — never your text — so it is safe to share.
 
 ## Non-English writing
