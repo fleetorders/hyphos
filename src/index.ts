@@ -46,6 +46,7 @@ export {
   buildPrompt,
   injectTypos,
   callClaudeCli,
+  extractRewrite,
   callApi,
   runRewrite,
 } from "./commands/rewrite.js";

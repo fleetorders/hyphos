@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildPrompt, judge } from "../src/commands/rewrite.js";
+import { buildPrompt, judge, extractRewrite } from "../src/commands/rewrite.js";
 import { registersInfo } from "../src/commands/score.js";
 import { SysExit } from "../src/commands/sysexit.js";
 
@@ -88,5 +88,52 @@ describe("register listing says which registers can be rewritten", () => {
   it("still lists it, because scoring against it works", () => {
     profilesWith("nogui", false);
     expect(registersInfo().map((r) => r.register)).toContain("nogui");
+  });
+});
+
+describe("the backend's reply must be a rewrite, not a conversation", () => {
+  it("takes the text between the markers", () => {
+    const out = extractRewrite("<<<REWRITE\nthe rewritten line\nREWRITE>>>");
+    expect(out).toBe("the rewritten line");
+  });
+
+  it("drops preamble and trailing commentary around the markers", () => {
+    // The observed failure: the backend answers conversationally and explains
+    // itself, and without a delimiter the explanation travels with the text.
+    const reply = [
+      "Here is the rewritten draft, and a note on what I changed.",
+      "<<<REWRITE",
+      "could you please review the PR when you get a minute?",
+      "REWRITE>>>",
+      "",
+      "Note: I produced this by imitation, not by running the engine.",
+    ].join("\n");
+    const out = extractRewrite(reply);
+    expect(out).toBe("could you please review the PR when you get a minute?");
+    expect(out).not.toMatch(/Note:/);
+    expect(out).not.toMatch(/rewritten draft/);
+  });
+
+  it("refuses a reply with no markers rather than passing the talk through", () => {
+    expect(() =>
+      extractRewrite("Sure! Here is your text, rewritten in your voice."),
+    ).toThrow(SysExit);
+    expect(() => extractRewrite("no markers here")).toThrow(
+      /did not honour the output contract/,
+    );
+  });
+
+  it("refuses an empty rewrite", () => {
+    expect(() => extractRewrite("<<<REWRITE\n \nREWRITE>>>")).toThrow(
+      /empty rewrite/,
+    );
+  });
+
+  it("asks for the markers in the prompt it builds", () => {
+    profilesWith("hasgui", true);
+    const prompt = buildPrompt("hasgui", "draft");
+    expect(prompt).toContain("<<<REWRITE");
+    expect(prompt).toContain("REWRITE>>>");
+    expect(prompt).toMatch(/no preamble/);
   });
 });

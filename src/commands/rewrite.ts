@@ -15,6 +15,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { pyRound } from "../lib/num.js";
 import { profilesDir } from "../lib/paths.js";
@@ -29,6 +30,39 @@ function readTextIfFile(p: string): string | null {
     // not a file / unreadable
   }
   return null;
+}
+
+/**
+ * The output contract with the backend.
+ *
+ * A backend is asked for rewritten text and can answer with a conversation:
+ * a preamble, a note on what it changed, a suggestion. Without a delimiter
+ * there is no way to tell the rewrite from the talk around it, and the talk
+ * travels into whatever the user sends. Markers make the contract checkable,
+ * and a backend that ignores them fails loudly instead of quietly handing
+ * back its own commentary.
+ */
+const OPEN = "<<<REWRITE";
+const CLOSE = "REWRITE>>>";
+
+/**
+ * Pull the rewritten text out of a backend reply, or refuse it.
+ */
+export function extractRewrite(out: string): string {
+  const i = out.indexOf(OPEN);
+  const j = out.lastIndexOf(CLOSE);
+  if (i < 0 || j < 0 || j < i) {
+    throw new SysExit(
+      "the backend did not honour the output contract: no " +
+        `${OPEN} ... ${CLOSE} block in its reply, so the rewrite cannot be ` +
+        "separated from any commentary around it. Nothing was written.",
+    );
+  }
+  const text = out.slice(i + OPEN.length, j).trim();
+  if (!text) {
+    throw new SysExit("the backend returned an empty rewrite.");
+  }
+  return text;
 }
 
 /**
@@ -58,7 +92,10 @@ export function buildPrompt(register: string, draft: string): string {
     "Rewrite the draft below so it reads as written by the person",
     "described in the style guide. Preserve the meaning and all facts.",
     "Match the register exactly; keep protected quirks; remove every",
-    "anti-pattern. Output ONLY the rewritten text.\n",
+    "anti-pattern.",
+    `Emit the rewritten text between ${OPEN} and ${CLOSE}, on their own`,
+    "lines, and write nothing else at all: no preamble, no explanation of",
+    "what you changed, no note about how you produced it.\n",
   ];
   parts.push("== STYLE GUIDE ==", styleGuide(register));
   const im = readTextIfFile(isms);
@@ -69,21 +106,54 @@ export function buildPrompt(register: string, draft: string): string {
 
 /** Drive the local `claude` CLI as a subprocess (synchronous). */
 export function callClaudeCli(prompt: string): string {
-  const r = spawnSync("claude", ["-p", prompt], {
-    encoding: "utf8",
-    timeout: 600000,
-    // Model output can be large; there is no size limit, so lift Node's
-    // default 1 MB cap to avoid truncating the response.
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (r.error) {
-    const code = (r.error as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") throw new Error("claude CLI not found on PATH");
-    throw new Error(`claude CLI failed: ${String(r.error).slice(0, 300)}`);
+  // Run the backend with no agency and no borrowed instructions.
+  //
+  // `claude -p` is an agent, not a completion endpoint: started in a project
+  // directory it loads that project's instructions and the user's settings,
+  // and it can act. Asked to rewrite a paragraph it has been observed doing
+  // unrelated work on the machine and narrating it in place of the rewrite.
+  // `--restricted` drops the command-running tools and the user, project and
+  // local settings files; `--permission-prompts none` denies anything that
+  // would otherwise prompt; and an empty working directory means no project
+  // instructions are found. The config directory is left alone on purpose —
+  // credentials live there, and moving it would break authentication.
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-rewrite-"));
+  try {
+    const r = spawnSync(
+      "claude",
+      ["--restricted", "--permission-prompts", "none", "-p", prompt],
+      {
+        cwd: workdir,
+        encoding: "utf8",
+        timeout: 600000,
+        // Model output can be large; there is no size limit, so lift Node's
+        // default 1 MB cap to avoid truncating the response.
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    );
+    if (r.error) {
+      const code = (r.error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") throw new Error("claude CLI not found on PATH");
+      throw new Error(`claude CLI failed: ${String(r.error).slice(0, 300)}`);
+    }
+    if (r.status !== 0) {
+      const err = (r.stderr ?? "").slice(0, 300);
+      // Refuse rather than retrying unisolated: a backend that cannot be
+      // restricted is one that can act, and silently falling back would give
+      // exactly the behaviour the flags exist to prevent.
+      if (/unknown option|unrecognized option/i.test(err)) {
+        throw new Error(
+          "this claude CLI does not support --restricted, so the rewrite " +
+            "cannot be run without tool access. Upgrade it, or use the api " +
+            "backend (--backend api).",
+        );
+      }
+      throw new Error(`claude CLI failed: ${err}`);
+    }
+    return (r.stdout ?? "").trim();
+  } finally {
+    fs.rmSync(workdir, { recursive: true, force: true });
   }
-  if (r.status !== 0)
-    throw new Error(`claude CLI failed: ${(r.stderr ?? "").slice(0, 300)}`);
-  return (r.stdout ?? "").trim();
 }
 
 /** Call the Anthropic Messages API using ANTHROPIC_API_KEY. */
@@ -267,8 +337,9 @@ export async function rewrite(
   let lastErr: unknown = null;
   for (const b of order) {
     try {
-      const out =
+      const raw =
         b === "claude" ? callClaudeCli(prompt) : await callApi(prompt);
+      const out = extractRewrite(raw);
       const [final, report] = enforce(out, register);
       let finalText = final;
       if (typos === "natural") {
