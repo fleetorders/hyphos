@@ -263,9 +263,29 @@ function rhythmOnly(fp: Fingerprint): Record<string, unknown> {
   return r;
 }
 
-function emailYear(ts: string): number | null {
-  for (const tok of ts.split(/\s+/)) {
+/**
+ * The year a record was written, whatever shape its timestamp arrived in.
+ *
+ * The year buckets are not an email feature, but only the mail ingest wrote a
+ * timestamp this could read: a bare four-digit token, as RFC-5322 has. Chat
+ * sources write epoch milliseconds and the session sources write ISO-8601, so
+ * for them the split silently never happened and no `-pre2023` or `-recent`
+ * profile was ever built — the one place a voice's drift over time is visible.
+ */
+export function recordYear(ts: string): number | null {
+  const t = ts.trim();
+  // ISO-8601, with or without a time: the year is the leading field.
+  const iso = /^(\d{4})-\d{2}(?:-\d{2})?/.exec(t);
+  if (iso) return parseInt(iso[1]!, 10);
+  // RFC-5322 and anything else carrying the year as its own token.
+  for (const tok of t.split(/\s+/)) {
     if (/^\d+$/.test(tok) && tok.length === 4) return parseInt(tok, 10);
+  }
+  // Epoch seconds or milliseconds, as the chat sources write.
+  if (/^\d{10}$|^\d{13}$/.test(t)) {
+    const ms = t.length === 13 ? Number(t) : Number(t) * 1000;
+    const y = new Date(ms).getUTCFullYear();
+    return Number.isFinite(y) ? y : null;
   }
   return null;
 }
@@ -322,7 +342,7 @@ export function runFingerprint(): number {
         continue;
       }
       push(buckets, bucket, o["text"] as string);
-      const y = emailYear(String(o["ts"] ?? ""));
+      const y = recordYear(String(o["ts"] ?? ""));
       if (y !== null && y < 2023)
         push(buckets, `${bucket}-pre2023`, o["text"] as string);
       else if (y !== null && y >= 2024)

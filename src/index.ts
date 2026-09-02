@@ -68,4 +68,4 @@ export { runTag } from "./stages/tag.js";
 export { runSalvage } from "./stages/salvage.js";
 export { runIngestChat } from "./stages/ingestChat.js";
 export { runIngestEmail } from "./stages/ingestEmail.js";
-export { runFingerprint } from "./stages/fingerprint.js";
+export { runFingerprint, recordYear } from "./stages/fingerprint.js";
