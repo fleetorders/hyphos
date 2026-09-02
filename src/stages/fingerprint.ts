@@ -350,6 +350,25 @@ export function runFingerprint(): number {
     }
   }
 
+  // A period sub-bucket that holds every record of its parent describes the
+  // same corpus under a second name: it advertises a register that does not
+  // exist, and any guide written for it would duplicate the parent's. Drop it
+  // and say so, rather than leaving a phantom to be discovered later.
+  for (const suffix of ["-pre2023", "-recent"]) {
+    for (const name of [...buckets.keys()]) {
+      if (!name.endsWith(suffix)) continue;
+      const parent = name.slice(0, -suffix.length);
+      const p = buckets.get(parent);
+      if (p && p.length === buckets.get(name)!.length) {
+        buckets.delete(name);
+        process.stdout.write(
+          `${name}: skipped — every record of ${parent} falls in this period, ` +
+            `so the sub-profile would duplicate it\n`,
+        );
+      }
+    }
+  }
+
   if (buckets.size === 0 && rhythmBuckets.size === 0) {
     process.stderr.write("no corpus files found\n");
     return 1;
