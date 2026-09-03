@@ -40,6 +40,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import AdmZip from "adm-zip";
 import { splitByLang } from "../lib/lang.js";
+import { dropNearDuplicateLines } from "../lib/dedupe.js";
 import { whitespaceSplit } from "../lib/text.js";
 import { Counter } from "../lib/counter.js";
 import { corpusDir } from "../lib/paths.js";
@@ -1143,7 +1144,16 @@ export function runIngestEmail(_argv: string[]): number {
   // The output is opened with mode "w" semantics (truncating even
   // when nothing is written); write once here for the same net effect.
   fs.mkdirSync(corpus, { recursive: true });
-  fs.writeFileSync(outPath, outChunks.join(""));
+  // The same letter reaches a mailbox more than once: sent to several
+  // recipients, or saved as draft, redraft and sent copy. Each would weight
+  // that one composition again in the fingerprint.
+  const deduped = dropNearDuplicateLines(outChunks);
+  fs.writeFileSync(outPath, deduped.kept.join(""));
+  if (deduped.removed)
+    process.stdout.write(
+      `  deduplicated: ${deduped.removed} re-sends or redrafts ` +
+        `(${deduped.removedWords} words)\n`,
+    );
 
   process.stdout.write(
     `kept: ${kept} messages, skipped short/empty: ${skipped}, dropped not-owner: ${notOwner}\n`,

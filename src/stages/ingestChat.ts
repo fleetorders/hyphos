@@ -28,6 +28,7 @@ import { Counter } from "../lib/counter.js";
 import { demojibake, whitespaceSplit } from "../lib/text.js";
 import { splitByLang, type Lang } from "../lib/lang.js";
 import { corpusDir } from "../lib/paths.js";
+import { dropNearDuplicateLines } from "../lib/dedupe.js";
 
 // `re.compile(r"https?://\S+")` — a run of non-whitespace after the scheme.
 const URL_RE = /https?:\/\/\S+/gu;
@@ -175,16 +176,18 @@ export function runIngestChat(argv: string[]): number {
   // One open file handle per source, created (and truncated) the first time a
   // thread of that source is seen — so a source that contributes no kept
   // messages still leaves an empty chat-<source>.jsonl.
-  const fds = new Map<string, number>();
+  // Buffered per source rather than streamed, because a duplicate can only be
+  // recognised against the rest of the source.
+  const bySource = new Map<string, string[]>();
   let kept = 0;
   const wordsByLang = new Map<Lang, number>();
   let droppedOthers = 0;
 
   for (const [source, t] of threads) {
-    let fd = fds.get(source);
-    if (fd === undefined) {
-      fd = fs.openSync(path.join(corpus, `chat-${source}.jsonl`), "w");
-      fds.set(source, fd);
+    let buf = bySource.get(source);
+    if (buf === undefined) {
+      buf = [];
+      bySource.set(source, buf);
     }
     const messages = (t["messages"] as unknown[] | undefined) ?? [];
     for (const mu of messages) {
@@ -203,21 +206,30 @@ export function runIngestChat(argv: string[]): number {
       if (whitespaceSplit(text).length < 3) continue;
       for (const [lang, chunk] of splitByLang(text)) {
         const words = whitespaceSplit(chunk).length;
-        fs.writeSync(
-          fd,
+        buf.push(
           jsonlLine(m["timestamp_ms"], `chat:${source}`, lang, words, chunk) +
             "\n",
         );
-        kept++;
         wordsByLang.set(lang, (wordsByLang.get(lang) ?? 0) + words);
       }
     }
   }
 
-  for (const fd of fds.values()) fs.closeSync(fd);
+  // A source that contributes no kept messages still leaves an empty file.
+  let deduped = 0;
+  for (const [source, buf] of bySource) {
+    const r = dropNearDuplicateLines(buf);
+    deduped += r.removed;
+    kept += r.kept.length;
+    fs.writeFileSync(
+      path.join(corpus, `chat-${source}.jsonl`),
+      r.kept.join(""),
+    );
+  }
 
   process.stdout.write(
-    `kept: ${kept} messages (owner only; ${droppedOthers} others dropped)\n`,
+    `kept: ${kept} messages (owner only; ${droppedOthers} others dropped, ` +
+      `${deduped} duplicates)\n`,
   );
   // sorted(words_by_lang.items()) — by language tag, in code-point order.
   const langs = [...wordsByLang.keys()].sort((a, b) =>

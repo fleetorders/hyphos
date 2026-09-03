@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { corpusDir } from "../lib/paths.js";
 import { whitespaceSplit } from "../lib/text.js";
+import { dropNearDuplicateLines } from "../lib/dedupe.js";
 
 // Fenced code block, non-greedy, DOTALL — `[\s\S]` matches newlines like Python
 // `re.S`. Global so every block is removed (Python `re.sub` replaces all).
@@ -174,6 +175,35 @@ export function runCurate(argv: string[]): number {
 
   // All output files are (re)created even when empty (`open("w")` truncation
   // semantics).
+
+  // One composition reaching the corpus several times — a prompt re-pasted
+  // across sessions, a message quoted back and re-extracted — would speak that
+  // many times louder than anything else in the fingerprint.
+  const curatedDedup = dropNearDuplicateLines(curatedLines);
+  const quarantineDedup = dropNearDuplicateLines(quarantineLines);
+  const aiMarkedDedup = dropNearDuplicateLines(aiMarkedLines);
+  curatedLines.length = 0;
+  curatedLines.push(...curatedDedup.kept);
+  quarantineLines.length = 0;
+  quarantineLines.push(...quarantineDedup.kept);
+  aiMarkedLines.length = 0;
+  aiMarkedLines.push(...aiMarkedDedup.kept);
+  const deduped =
+    curatedDedup.removed + quarantineDedup.removed + aiMarkedDedup.removed;
+  // The counters above were tallied per record as they were classified; the
+  // kept totals have to be re-derived from what actually survives.
+  kept = curatedLines.length;
+  keptWords = curatedLines.reduce(
+    (t, l) => t + Number((JSON.parse(l) as { words?: unknown }).words ?? 0),
+    0,
+  );
+  quarantined = quarantineLines.length;
+  qWords = quarantineLines.reduce(
+    (t, l) => t + Number((JSON.parse(l) as { words?: unknown }).words ?? 0),
+    0,
+  );
+  aiMarked = aiMarkedLines.length;
+
   fs.writeFileSync(curatedPath, curatedLines.join(""));
   fs.writeFileSync(quarantinePath, quarantineLines.join(""));
   fs.writeFileSync(aiMarkedPath, aiMarkedLines.join(""));
@@ -193,5 +223,6 @@ export function runCurate(argv: string[]): number {
   );
   process.stdout.write(`ai-marked (excluded from voice): ${aiMarked}\n`);
   process.stdout.write(`dropped empty after strip: ${droppedEmpty}\n`);
+  process.stdout.write(`re-sends and redrafts deduplicated: ${deduped}\n`);
   return 0;
 }
