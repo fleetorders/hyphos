@@ -79,7 +79,8 @@ function styleGuide(register: string): string {
   if (g === null) {
     throw new SysExit(
       `register "${register}" has no styleguide.md, so a rewrite would not be ` +
-        `in your voice. Registers without one can be scored but not rewritten.`,
+        `in your voice. Registers without one can be scored but not rewritten. ` +
+        `(profiles dir: ${profilesDir()})`,
     );
   }
   return g;
@@ -374,7 +375,8 @@ export async function runRewrite(
   );
   process.stdout.write(out);
   process.stderr.write(
-    `\n== backend: ${backend} ==\n== enforcement ==\n` +
+    `\n== backend: ${backend} ==\n== profiles: ${profilesDir()} ==\n` +
+      `== enforcement ==\n` +
       pyDumps(report, { indent: 1 }) +
       "\n",
   );
