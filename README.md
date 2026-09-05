@@ -56,8 +56,11 @@ npx hyphos rules --test       # self-test the deterministic enforcement rules
 
 Corpus output lands in `corpus/` and profiles in `profiles/` under the
 package root (resolved from the CLI's own location, so commands work from any
-directory); point `HYPHOS_HOME` at another location to relocate both, or
-`HYPHOS_CORPUS` / `HYPHOS_PROFILES` to override one. Stdout
+directory). The published package ships no `profiles/`, so when the package
+root carries none, a current working directory inside a hyphos checkout wins —
+`npx hyphos rewrite` run from your checkout uses your profiles, and prints the
+profiles dir it used. Point `HYPHOS_HOME` at another location to relocate
+both, or `HYPHOS_CORPUS` / `HYPHOS_PROFILES` to override one. Stdout
 prints aggregate numbers only — never your text — so it is safe to share.
 
 ## Non-English writing
