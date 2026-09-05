@@ -1,5 +1,103 @@
 # hyphos
 
+## 0.4.0
+
+### Minor Changes
+
+- Deduplicate re-sends and redrafts in every ingest path.
+
+  One composition reaches a corpus more than once: a letter sent to five
+  recipients, a draft saved beside its redraft and the sent copy, a prompt
+  re-pasted across sessions. Each copy weights that single composition again in
+  the fingerprint, so one letter can speak five times louder than anything else
+  the author wrote — and nothing in the pipeline noticed.
+
+  `src/lib/dedupe.ts` adds the primitive, and `curate`, `ingest-email` and
+  `ingest-chat` all apply it before writing, so the removal survives a re-run
+  instead of being a hand-edit that the next ingest undoes.
+
+  Two guards keep it from eating real writing. A length floor of 25 words, below
+  which repetition is habit rather than filing: an acknowledgement repeated a
+  hundred times is part of a voice. And Jaccard overlap rather than containment —
+  containment measures shared runs against the SMALLER text, so a short message
+  quoted inside a long one scores near 1.0 against it, and since the fullest copy
+  is the one kept, the short original would be the one deleted.
+
+- 8a13cce: Build the `-pre2023` and `-recent` profiles for every source, not just mail.
+
+  Splitting a register by period is how a voice's drift over time becomes
+  visible, and it matters most where the corpus straddles a change in how you
+  write. The split was never meant to be a mail feature — but the year was read
+  by whitespace-splitting the timestamp and taking a four-digit token, which only
+  the RFC-5322 dates written by the mail ingest produce. Chat sources write epoch
+  milliseconds and the session sources write ISO-8601, so for all of them the
+  split silently did nothing and the sub-profiles were never built.
+
+  The year is now read from any of the three shapes: an ISO-8601 date, a bare
+  four-digit token, or an epoch in seconds or milliseconds. Chat and other
+  non-mail registers gain their period profiles on the next `fingerprint` run.
+  `recordYear` is exported for anyone building on the corpus format.
+
+- 735de62: Put controls on the rewrite backend: no agency, and a checkable output
+  contract.
+
+  `claude -p` is an agent, not a completion endpoint. Started in the user's
+  project directory it loaded that project's instructions and the user's
+  settings, and it could act — asked to rewrite a paragraph it was observed
+  performing unrelated work on the machine and narrating that in place of the
+  rewrite. The CLI backend now runs with `--restricted` (no command-running
+  tools, and user, project and local settings ignored), with
+  `--permission-prompts none` so anything that would prompt is denied, and in an
+  empty working directory so no project instructions are found. The config
+  directory is deliberately left alone, because credentials live there. A CLI too
+  old to accept `--restricted` is refused rather than retried without it: falling
+  back would give exactly the behaviour the flags prevent.
+
+  The prompt now asks for the rewrite between two markers and forbids anything
+  outside them, and the reply is parsed for that block. A backend that answers
+  conversationally — a preamble, a note on what it changed, a suggestion — used
+  to have all of that pass through as if it were the rewritten text and into
+  whatever the user sent. It is now a loud failure instead. `extractRewrite` is
+  exported for anyone driving a backend of their own.
+
+- ad55154: Refuse to rewrite a register that has no style guide, instead of quietly
+  rewriting in nobody's voice.
+
+  A register needs two things: a fingerprint, which measures a draft, and a
+  distilled style guide, which describes the voice to write in. Only the first is
+  produced by the pipeline, so a freshly fingerprinted register has one and not
+  the other. `buildPrompt` used to omit the style-guide section when the file was
+  absent — the prompt still formed, the model still answered, and the result was
+  simply not in the author's voice, with nothing anywhere to say why. `judge` was
+  worse: it substituted the literal string `(missing)` for the guide and returned
+  confident scores against it.
+
+  Both now raise `SysExit` naming the register. Scoring is unaffected, because a
+  fingerprint is all a score needs.
+
+  `RegisterInfo` gains a `rewritable` field, so a listing can distinguish a
+  register that can be written in from one that can only be measured against, and
+  a register missing its guide now carries a hint saying exactly that.
+
+### Patch Changes
+
+- 7bd0e9c: Resolve profiles from the cwd's hyphos checkout when the package root ships none, and say which dir was used.
+
+  The published package carries only `dist/`, so `npx hyphos rewrite` resolved its profiles dir inside the npx cache — empty. The rewrite then ran with no style guide (older versions: nobody's voice, silently) or refused (0.3.0+: loud, but still no rewrite). When the package root has no `profiles/`, the data root now prefers a current working directory inside a hyphos checkout that has one, so running `npx hyphos rewrite` from your checkout uses your profiles. `rewrite` prints the profiles dir it used next to the backend, and the no-style-guide refusal names the dir it searched, so a wrong root is visible in one line. `HYPHOS_HOME` and `HYPHOS_CORPUS` / `HYPHOS_PROFILES` keep precedence.
+
+- 53f9631: Do not build a period sub-profile that duplicates its parent.
+
+  `-pre2023` and `-recent` exist to show how a voice moved between periods. When
+  every record of a source falls on one side of the split, the sub-bucket holds
+  the whole corpus and shows nothing — but it still appeared in the register
+  listing as though it were a register of its own, with a fingerprint identical
+  to its parent's, inviting a style guide that would duplicate one that already
+  exists.
+
+  Such a sub-bucket is now skipped, with a line saying which one and why, since a
+  profile that quietly never appears is harder to explain than one that announces
+  its own absence.
+
 ## 0.3.0
 
 ### Minor Changes
