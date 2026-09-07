@@ -105,6 +105,36 @@ export function buildPrompt(register: string, draft: string): string {
   return parts.join("\n");
 }
 
+/**
+ * Env var that marks a process as the model backend of a running hyphos (set
+ * on the child by `callClaudeCli`). The CLI entry refuses to start under it —
+ * see `backendRefusal`.
+ */
+export const BACKEND_ENV = "HYPHOS_BACKEND";
+
+/**
+ * Refusal message for a hyphos started from inside its own model backend, or
+ * null when the env is clean. The spawn flags in `callClaudeCli` strip the
+ * backend's agency, but a flag's meaning can drift as the CLI updates under a
+ * fixed name, and a user's global agent instructions may route prose through
+ * this tool — so an unguarded backend call can recurse, the child re-invoking
+ * hyphos on its own input until the spawn timeout. This guard kills the class
+ * backend-agnostically: whatever the backend model decides, the nested hyphos
+ * exits immediately and tells it to answer in place.
+ */
+export function backendRefusal(
+  env: NodeJS.ProcessEnv = process.env,
+): string | null {
+  if (env[BACKEND_ENV] === "1") {
+    return (
+      "hyphos: refusing to start: this process is the model backend of an " +
+      "already-running hyphos (HYPHOS_BACKEND=1) — rewrite the text " +
+      "directly in your reply; do not invoke hyphos."
+    );
+  }
+  return null;
+}
+
 /** Drive the local `claude` CLI as a subprocess (synchronous). */
 export function callClaudeCli(prompt: string): string {
   // Run the backend with no agency and no borrowed instructions.
@@ -126,6 +156,9 @@ export function callClaudeCli(prompt: string): string {
       {
         cwd: workdir,
         encoding: "utf8",
+        // Mark the child so a nested `hyphos` invocation refuses to start —
+        // see backendRefusal.
+        env: { ...process.env, [BACKEND_ENV]: "1" },
         timeout: 600000,
         // Model output can be large; there is no size limit, so lift Node's
         // default 1 MB cap to avoid truncating the response.
@@ -219,7 +252,9 @@ export async function judge(
   ].join("\n");
 
   const order = backend === "auto" ? ["claude", "api"] : [backend];
-  let lastErr: unknown = null;
+  // Report every backend's own failure, never only the last: a claude-CLI
+  // timeout hidden behind an api-key error once cost a whole diagnosis.
+  const failures: string[] = [];
   for (const b of order) {
     try {
       const raw =
@@ -230,12 +265,10 @@ export async function judge(
       out["backend"] = b;
       return out;
     } catch (e) {
-      lastErr = e;
+      failures.push(`${b}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  return {
-    error: `judge failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
-  };
+  return { error: `judge failed — ${failures.join("; ")}` };
 }
 
 // --- typo injection (D-006, opt-in) ---
@@ -335,7 +368,8 @@ export async function rewrite(
 ): Promise<[string, EnforceReport, string]> {
   const prompt = buildPrompt(register, draft);
   const order = backend === "auto" ? ["claude", "api"] : [backend];
-  let lastErr: unknown = null;
+  // Same honest-error rule as `judge`: every backend's own failure is named.
+  const failures: string[] = [];
   for (const b of order) {
     try {
       const raw =
@@ -350,12 +384,10 @@ export async function rewrite(
       }
       return [finalText, report, b];
     } catch (e) {
-      lastErr = e;
+      failures.push(`${b}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  throw new SysExit(
-    `no backend succeeded: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
-  );
+  throw new SysExit(`no backend succeeded — ${failures.join("; ")}`);
 }
 
 /**
