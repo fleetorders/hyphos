@@ -48,7 +48,7 @@
   "dependencies": {
     "adm-zip": "0.6.0",
     "commander": "12.1.0",
-    "mailparser": "3.9.15",
+    "mailparser": "3.9.23",
     "picocolors": "1.1.1"
   },
   "devDependencies": {
