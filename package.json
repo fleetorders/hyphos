@@ -55,6 +55,7 @@
     "@changesets/cli": "^3.0.0",
     "@types/mailparser": "3.4.6",
     "@types/node": "22.10.2",
+    "peirad": "0.4.0",
     "prettier": "3.4.2",
     "tsup": "8.5.1",
     "tsx": "4.23.12",

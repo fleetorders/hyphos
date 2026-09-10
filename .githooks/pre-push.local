@@ -13,3 +13,11 @@
 echo "› npm test (git environment scrubbed)"
 # shellcheck disable=SC2046  # the split is the point: each name becomes its own `-u NAME` argument
 env $(env | grep -o '^GIT_[A-Za-z0-9_]*' | sed 's/^/-u /') npm test || exit 1
+
+# The extract stage reads Claude Code's transcript files, and `peirad.json` declares the fields
+# it depends on. Checking that contract against the harness actually installed here turns a
+# silent field rename upstream into a blocked push instead of an empty corpus. peirad is a
+# pinned devDependency so the check resolves locally, offline, at one known version.
+echo "› npm run doctor (peirad: transcript contract against the installed Claude Code)"
+# shellcheck disable=SC2046  # same split as above: one `-u NAME` per exported GIT_* name
+env $(env | grep -o '^GIT_[A-Za-z0-9_]*' | sed 's/^/-u /') npm run -s doctor || exit 1
