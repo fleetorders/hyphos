@@ -1,18 +1,18 @@
 {
-  "packVersion": "7",
-  "etymdVersion": "0.10.0",
-  "approvedAt": "2026-08-17T17:33:10.028Z",
+  "packVersion": "12",
+  "etymdVersion": "0.17.0",
+  "approvedAt": "2026-09-10T22:36:07.393Z",
   "profile": "solo",
   "facts": {
-    "etymdVersion": "0.10.0",
-    "packVersion": "7",
-    "generatedAt": "2026-08-17T17:33:10.027Z",
+    "etymdVersion": "0.17.0",
+    "packVersion": "12",
+    "generatedAt": "2026-09-10T22:36:07.391Z",
     "root": ".",
     "name": "hyphos",
     "git": {
       "isRepo": true,
       "branch": "main",
-      "head": "8b2a2a4",
+      "head": "6c635cb",
       "hooksPath": ".githooks",
       "husky": false,
       "recentAuthors": 1
@@ -36,7 +36,6 @@
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "prepare": "npm run build",
-        "doctor": "npx peirad --manifest peirad.json --config-dir \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"",
         "prepublishOnly": "./scripts/artifact-check.sh",
         "changeset": "changeset",
         "version:packages": "changeset version"
@@ -105,7 +104,7 @@
         "label": "CLAUDE.md (Claude Code pointer)",
         "path": "CLAUDE.md",
         "kind": "adapter",
-        "exists": false
+        "exists": true
       },
       {
         "id": "copilot",
@@ -203,12 +202,12 @@
       "scripts": 4
     },
     "freshness": {
-      "repoLastCommit": "2026-08-17T19:25:23+02:00",
+      "repoLastCommit": "2026-09-11T01:19:53+03:00",
       "artifacts": [
         {
           "artifactId": "decisions",
           "path": "DECISIONS.md",
-          "lastCommit": "2026-08-17T19:18:53+02:00",
+          "lastCommit": "2026-08-31T02:14:30+03:00",
           "commitsSince": true
         }
       ],
@@ -217,32 +216,40 @@
     "tree": {
       "dirs": [
         {
-          "name": "profiles",
-          "files": 30
+          "name": "corpus",
+          "files": 2505
         },
         {
-          "name": "corpus",
-          "files": 24
+          "name": "profiles",
+          "files": 40
         },
         {
           "name": "src",
-          "files": 21
-        },
-        {
-          "name": ".changeset",
-          "files": 9
+          "files": 24
         },
         {
           "name": "test",
-          "files": 4
+          "files": 9
+        },
+        {
+          "name": "local",
+          "files": 8
+        },
+        {
+          "name": ".githooks",
+          "files": 6
         },
         {
           "name": "web",
           "files": 4
         },
         {
-          "name": ".githooks",
-          "files": 3
+          "name": ".changeset",
+          "files": 2
+        },
+        {
+          "name": "docs",
+          "files": 2
         },
         {
           "name": "media",
@@ -250,10 +257,6 @@
         },
         {
           "name": ".github",
-          "files": 1
-        },
-        {
-          "name": "docs",
           "files": 1
         },
         {

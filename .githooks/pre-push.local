@@ -14,10 +14,9 @@ echo "› npm test (git environment scrubbed)"
 # shellcheck disable=SC2046  # the split is the point: each name becomes its own `-u NAME` argument
 env $(env | grep -o '^GIT_[A-Za-z0-9_]*' | sed 's/^/-u /') npm test || exit 1
 
-# The extract stage reads Claude Code's transcript files, and `peirad.json` declares the fields
-# it depends on. Checking that contract against the harness actually installed here turns a
-# silent field rename upstream into a blocked push instead of an empty corpus. peirad is a
-# pinned devDependency so the check resolves locally, offline, at one known version.
-echo "› npm run doctor (peirad: transcript contract against the installed Claude Code)"
-# shellcheck disable=SC2046  # same split as above: one `-u NAME` per exported GIT_* name
-env $(env | grep -o '^GIT_[A-Za-z0-9_]*' | sed 's/^/-u /') npm run -s doctor || exit 1
+# A machine-local companion, when this checkout has one. `local/` is gitignored, so whatever runs
+# there is this machine's concern alone and never a requirement on anyone else's push.
+LOCAL_HOOK="$(dirname "$0")/../local/hooks/pre-push"
+if [ -x "$LOCAL_HOOK" ]; then
+  "$LOCAL_HOOK" "$@" || exit 1
+fi

@@ -304,3 +304,24 @@ score anyway. Splitting flag (deterministic) from replacement (model-chosen)
 gives each half the job it is good at; the zero-width guard added the same
 night (empty or missing patterns are inert, not length+1 hits) keeps the
 count itself trustworthy.
+
+### D-017 — Machine-local checks stay out of the tracked hooks
+
+**Scope:** repo · **Decided:** 2026-09-11
+
+A check that presumes the maintainer's own environment — a particular tool
+installed, files present under the home directory, a checker that exists to
+observe this machine — never enters a tracked hook, the package manifest, or
+any other tracked file. Such checks live under the gitignored `local/`
+directory, and the tracked `.githooks/pre-push.local` carries one generic
+seam: run `local/hooks/pre-push` when it exists, otherwise do nothing.
+
+**Why:** the tracked hooks are a requirement on every contributor's push, and
+every tracked file is read by strangers; a contributor without the
+maintainer's setup was blocked, and the repository advertised that setup.
+Maintainer ruling of 2026-09-11, reverting a same-day commit that had done
+both.
+
+**Consequences:** `local/` is the home for anything that observes this
+checkout only; nothing tracked names what runs there. The published package
+was never affected (it ships `dist/` only).
