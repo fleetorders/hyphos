@@ -49,6 +49,8 @@ export {
   extractRewrite,
   callApi,
   runRewrite,
+  backendRefusal,
+  BACKEND_ENV,
 } from "./commands/rewrite.js";
 
 // Blind self-test.

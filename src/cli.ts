@@ -14,7 +14,7 @@
 import { Command, Option } from "commander";
 import { runRules, runEnforce } from "./commands/rules.js";
 import { runScore } from "./commands/score.js";
-import { runRewrite } from "./commands/rewrite.js";
+import { runRewrite, backendRefusal } from "./commands/rewrite.js";
 import { runBlind } from "./commands/blind.js";
 import { runServe } from "./commands/serve.js";
 import { SysExit } from "./commands/sysexit.js";
@@ -145,6 +145,14 @@ program
   });
 
 async function main(): Promise<void> {
+  // Recursion guard, before any command runs: a hyphos spawned by its own
+  // model backend (HYPHOS_BACKEND=1) must refuse fast and teach the caller
+  // to answer in place — see backendRefusal for the why.
+  const refusal = backendRefusal();
+  if (refusal) {
+    process.stderr.write(refusal + "\n");
+    process.exit(1);
+  }
   try {
     await program.parseAsync(process.argv);
   } catch (e) {

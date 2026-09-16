@@ -60,7 +60,9 @@ directory). The published package ships no `profiles/`, so when the package
 root carries none, a current working directory inside a hyphos checkout wins —
 `npx hyphos rewrite` run from your checkout uses your profiles, and prints the
 profiles dir it used. Point `HYPHOS_HOME` at another location to relocate
-both, or `HYPHOS_CORPUS` / `HYPHOS_PROFILES` to override one. Stdout
+both, or `HYPHOS_CORPUS` / `HYPHOS_PROFILES` to override one.
+`HYPHOS_BACKEND` is reserved for hyphos's own internal use; a hyphos started
+under it refuses to run, so never set it yourself. Stdout
 prints aggregate numbers only — never your text — so it is safe to share.
 
 ## Non-English writing
