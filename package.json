@@ -45,7 +45,7 @@
     "node": ">=18.17"
   },
   "dependencies": {
-    "adm-zip": "0.6.0",
+    "adm-zip": "0.6.1",
     "commander": "12.1.0",
     "mailparser": "3.9.15",
     "picocolors": "1.1.1"
