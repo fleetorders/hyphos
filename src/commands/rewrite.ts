@@ -105,6 +105,23 @@ export function buildPrompt(register: string, draft: string): string {
   return parts.join("\n");
 }
 
+// The claude backend's working directory: one fixed path, not a fresh temp
+// folder per call. The harness files every session's transcript under a
+// project folder named after the working directory, so a per-call folder
+// mints a new project folder per call, and they accumulate by the thousand.
+// The directory must stay empty — emptiness is what keeps project
+// instructions out of the rewrite — so stale contents are cleared, not used.
+const CLAUDE_SCRATCH_DIR = path.join(os.tmpdir(), "hyphos-rewrite");
+
+export function claudeScratchDir(): string {
+  fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true });
+  if (fs.readdirSync(CLAUDE_SCRATCH_DIR).length > 0) {
+    fs.rmSync(CLAUDE_SCRATCH_DIR, { recursive: true, force: true });
+    fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true });
+  }
+  return CLAUDE_SCRATCH_DIR;
+}
+
 /** Drive the local `claude` CLI as a subprocess (synchronous). */
 export function callClaudeCli(prompt: string): string {
   // Run the backend with no agency and no borrowed instructions.
@@ -118,43 +135,39 @@ export function callClaudeCli(prompt: string): string {
   // would otherwise prompt; and an empty working directory means no project
   // instructions are found. The config directory is left alone on purpose —
   // credentials live there, and moving it would break authentication.
-  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-rewrite-"));
-  try {
-    const r = spawnSync(
-      "claude",
-      ["--restricted", "--permission-prompts", "none", "-p", prompt],
-      {
-        cwd: workdir,
-        encoding: "utf8",
-        timeout: 600000,
-        // Model output can be large; there is no size limit, so lift Node's
-        // default 1 MB cap to avoid truncating the response.
-        maxBuffer: 64 * 1024 * 1024,
-      },
-    );
-    if (r.error) {
-      const code = (r.error as NodeJS.ErrnoException).code;
-      if (code === "ENOENT") throw new Error("claude CLI not found on PATH");
-      throw new Error(`claude CLI failed: ${String(r.error).slice(0, 300)}`);
-    }
-    if (r.status !== 0) {
-      const err = (r.stderr ?? "").slice(0, 300);
-      // Refuse rather than retrying unisolated: a backend that cannot be
-      // restricted is one that can act, and silently falling back would give
-      // exactly the behaviour the flags exist to prevent.
-      if (/unknown option|unrecognized option/i.test(err)) {
-        throw new Error(
-          "this claude CLI does not support --restricted, so the rewrite " +
-            "cannot be run without tool access. Upgrade it, or use the api " +
-            "backend (--backend api).",
-        );
-      }
-      throw new Error(`claude CLI failed: ${err}`);
-    }
-    return (r.stdout ?? "").trim();
-  } finally {
-    fs.rmSync(workdir, { recursive: true, force: true });
+  const workdir = claudeScratchDir();
+  const r = spawnSync(
+    "claude",
+    ["--restricted", "--permission-prompts", "none", "-p", prompt],
+    {
+      cwd: workdir,
+      encoding: "utf8",
+      timeout: 600000,
+      // Model output can be large; there is no size limit, so lift Node's
+      // default 1 MB cap to avoid truncating the response.
+      maxBuffer: 64 * 1024 * 1024,
+    },
+  );
+  if (r.error) {
+    const code = (r.error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") throw new Error("claude CLI not found on PATH");
+    throw new Error(`claude CLI failed: ${String(r.error).slice(0, 300)}`);
   }
+  if (r.status !== 0) {
+    const err = (r.stderr ?? "").slice(0, 300);
+    // Refuse rather than retrying unisolated: a backend that cannot be
+    // restricted is one that can act, and silently falling back would give
+    // exactly the behaviour the flags exist to prevent.
+    if (/unknown option|unrecognized option/i.test(err)) {
+      throw new Error(
+        "this claude CLI does not support --restricted, so the rewrite " +
+          "cannot be run without tool access. Upgrade it, or use the api " +
+          "backend (--backend api).",
+      );
+    }
+    throw new Error(`claude CLI failed: ${err}`);
+  }
+  return (r.stdout ?? "").trim();
 }
 
 /** Call the Anthropic Messages API using ANTHROPIC_API_KEY. */
