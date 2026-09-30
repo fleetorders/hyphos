@@ -67,7 +67,7 @@ const NOISY = new Set<MetricKey>([
   "lower_start_rate",
 ]);
 
-// Python `str[:1].islower()` for a single leading char: cased and lowercase.
+// The leading char is cased and lowercase (a digit or mark does not count).
 function firstIsLower(s: string): boolean {
   const c = s.slice(0, 1);
   return c.length > 0 && c === c.toLowerCase() && c !== c.toUpperCase();
@@ -110,7 +110,7 @@ export function loadFingerprint(register: string): Record<string, unknown> {
   return pyJsonParse(raw) as Record<string, unknown>;
 }
 
-// `dict.get(key, default)` over a possibly-missing nested value.
+// Look up a possibly-missing nested value, with a default.
 function getOr(
   obj: unknown,
   key: string,
@@ -126,7 +126,7 @@ function getOr(
   return dflt;
 }
 
-// Python `round(v, nd)`: a float stays a float (PyFloat), an int stays an int.
+// Round half to even; a float stays a float (PyFloat), an int stays an int.
 function roundKeepType(v: number | PyFloat, nd: number): number | PyFloat {
   if (v instanceof PyFloat) return new PyFloat(pyRound(v.value, nd));
   return pyRound(v, nd);
@@ -289,8 +289,7 @@ export function inferRegister(text: string): InferResult {
   }
   if (ranked.length === 0)
     return { register: "editorial", confidence: "none", scores: {} };
-  // Python `list.sort(reverse=True)` on (fidelity, register) tuples: descending
-  // by fidelity, then descending by register name for ties.
+  // Descending by fidelity, then descending by register name for ties.
   ranked.sort((a, b) =>
     b[0] !== a[0] ? b[0] - a[0] : b[1] < a[1] ? -1 : b[1] > a[1] ? 1 : 0,
   );
@@ -306,8 +305,8 @@ export function inferRegister(text: string): InferResult {
 
 /**
  * `score` subcommand: score a file against a register and print the JSON result
- * (Python `json.dumps(..., indent=1)` — non-ASCII escaped). With `--judge`, the
- * model-judged half is added. Returns an exit code.
+ * (one-space indent, non-ASCII escaped). With `--judge`, the model-judged half
+ * is added. Returns an exit code.
  */
 export async function runScore(
   file: string,

@@ -1,6 +1,6 @@
 # Design — how hyphos works
 
-Mechanism only. Decisions live in `DECISIONS.md`; usage in `README.md`.
+Mechanism only. Decisions live in `docs/decisions.md`; usage in `README.md`.
 
 ## Pipeline
 
@@ -37,7 +37,7 @@ only; drops tool results, command wrappers, paste placeholders (pasted text is
 not the user's writing), bare slash commands, and exact duplicates. Stdout is
 aggregate-only so it can be shared without leaking project names.
 
-## Fidelity (planned)
+## Fidelity (shipped; calibration open)
 
 Two components reported together: a stylometric distance between the output and
 the register's corpus (computed, model-free) and a judge rubric run by a model.

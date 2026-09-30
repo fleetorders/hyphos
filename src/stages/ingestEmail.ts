@@ -1,6 +1,5 @@
 /**
- * Stage 0 (email) — ingest sent e-mail as corpus material (mbox parsing that
- * mirrors Python's `mailbox` + `email.policy` semantics).
+ * Stage 0 (email) — ingest sent e-mail as corpus material.
  *
  * Reads Google Takeout archives (corpus/inbox/*.zip containing a Sent .mbox) or
  * bare .mbox files dropped in corpus/inbox/, plus Outlook-for-Mac .olm archives.
@@ -16,24 +15,25 @@
  * only (counts) — never message text, names, or addresses (privacy contract).
  *
  * ── Why not mailparser ────────────────────────────────────────────────────────
- * `mailparser` was evaluated first (it is the obvious MIME library), but its
- * high-level `simpleParser` cannot reproduce the Python `email` behaviour the
- * stage depends on bit-for-bit, as verified against real archives:
+ * `mailparser` is a dependency of this package, but its parser is not used —
+ * only `iconv-lite`, its charset engine, is. Its high-level `simpleParser`
+ * disagrees with what this stage needs from MIME in three ways, each of which
+ * changes the extracted corpus:
  *   1. It AGGREGATES every text/plain (or every text/html) part into one string,
- *      whereas Python's `get_body(preferencelist=("plain","html"))` selects a
- *      SINGLE part. Messages with two html branches (e.g. an empty body next to a
- *      signature part) then gain spurious extra records.
+ *      whereas a SINGLE body part must be selected. Messages with two html
+ *      branches (e.g. an empty body next to a signature part) then gain
+ *      spurious extra records.
  *   2. It UN-FLOWS `format=flowed` text/plain (RFC 3676), joining soft-wrapped
- *      lines; Python's `get_content()` returns the raw text, so line structure —
- *      and therefore the `"\n-- \n"` signature split and per-paragraph language
- *      split — diverges (flowed mail is common).
- *   3. It normalizes CRLF→LF; Python preserves the original line endings, which
- *      the signature-delimiter split is sensitive to.
- * So MIME structure, part selection and transfer decoding implement
- * get_body + get_content directly, and charset decoding uses `iconv-lite`
- * — mailparser's own charset engine, which matches Python's codecs byte-for-byte
- * on the charsets seen in real mail (utf-8, us-ascii, iso-8859-1/7/15, windows-1251/1252/1253). No
- * async remains, so this entry point runs and returns synchronously.
+ *      lines; the raw line structure is what the `"\n-- \n"` signature split
+ *      and the per-paragraph language split work on, so un-flowing silently
+ *      changes both.
+ *   3. It normalizes CRLF→LF; the signature-delimiter split is sensitive to the
+ *      original line endings.
+ * So MIME structure, part selection and transfer decoding are implemented
+ * directly, and charset decoding uses `iconv-lite`, covering the charsets mail
+ * declares in practice (utf-8, us-ascii, iso-8859-1/7/15,
+ * windows-1251/1252/1253). No async remains, so this entry point runs and
+ * returns synchronously.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -45,9 +45,9 @@ import { whitespaceSplit } from "../lib/text.js";
 import { Counter } from "../lib/counter.js";
 import { corpusDir } from "../lib/paths.js";
 
-// iconv-lite is a dependency of mailparser (already installed) and is the charset
-// decoder mailparser itself uses; it reproduces Python's `bytes.decode(charset,
-// errors="replace")` (including the U+FFFD replacements) for every charset here.
+// iconv-lite is not a direct dependency: it is loaded via createRequire as
+// mailparser's transitive dependency (mailparser itself is never imported).
+// It decodes with U+FFFD replacement for undecodable bytes.
 const iconv = createRequire(import.meta.url)("iconv-lite") as {
   decode(
     buf: Buffer,
@@ -57,31 +57,29 @@ const iconv = createRequire(import.meta.url)("iconv-lite") as {
   encodingExists(encoding: string): boolean;
 };
 
-// ── Regexes (flags chosen to match Python `re`) ────────────────────────────────
+// ── Regexes ────────────────────────────────────────────────────────────────────
 
-// Quoted reply / forwarded-message intros. Python compiled with (?im); applied
-// per line via `.match(line)` (anchored at start). The `m` flag is inert on a
-// single line but kept for fidelity; `.` never matches a newline in either engine
-// (no DOTALL), matching Python.
+// Quoted reply / forwarded-message intros, matched per line (anchored at the
+// start, case-insensitive). `.` never matches a newline.
 const QUOTE_INTRO_RE =
   /^\s*(-*\s*on .{5,120}wrote\s*-*:?|-{3,} ?forwarded message ?-{3,}|-{3,} ?original message ?-{3,}|am .{5,80}schrieb:?|op .{5,80}schreef:?|##-.*-##|from:\s.+|sent:\s.+|to:\s.+|subject:\s.+|στις .{5,80}έγραψε:?)\s*$/im;
 const OUTLOOK_DIVIDER_RE = /^\s*_{10,}\s*$/; // Outlook reply divider line
 const URL_RE = /https?:\/\/\S+/g;
 const TAG_RE = /<[^>]+>/g;
 const HTMLISH_RE = /<(html|body|div|p|span|meta)[ >]/i;
-// Delivery-failure bounces. Python compiled with re.I only (no MULTILINE), so `^`
-// anchors at string start; `.` never crosses a newline.
+// Delivery-failure bounces: case-insensitive, `^` anchored at string start,
+// `.` never crossing a newline.
 const BOUNCE_RE =
   /^\s*(\*\* ?Delivery (incomplete|has failed)|Delivery Status Notification|Your message .{0,60}(couldn't|could not) be delivered)/i;
 
-// ── HTML entity decoding (replicates Python's html.unescape, pragmatically) ────
+// ── HTML entity decoding (pragmatic subset) ────────────────────────────────────
 //
-// Python's html.unescape resolves the FULL HTML5 named-entity table (~2000 names,
-// some without a trailing semicolon) plus numeric refs with a Windows-1252 remap
-// for 0x80–0x9F. We cover numeric refs (with that remap) and a curated set of the
-// named entities that actually appear in mail. DIVERGENCE: exotic named entities
-// and the no-semicolon legacy forms outside this set are left un-decoded. This
-// only affects html-only messages, so it is scoped narrowly.
+// Full HTML5 entity decoding resolves a ~2000-name table (some without a
+// trailing semicolon) plus numeric refs with a Windows-1252 remap for
+// 0x80–0x9F. We cover numeric refs (with that remap) and a curated set of the
+// named entities that appear in mail. Exotic named entities and the
+// no-semicolon legacy forms outside this set are left un-decoded. This only
+// affects html-only messages, so it is scoped narrowly.
 const CP1252: Record<number, string> = {
   0x80: "€",
   0x82: "‚",
@@ -256,7 +254,7 @@ function htmlUnescape(s: string): string {
       const name = ref.replace(/;$/, "");
       if (Object.prototype.hasOwnProperty.call(NAMED, name))
         return NAMED[name]!;
-      return m; // unknown entity: leave verbatim (as Python does for non-matches)
+      return m; // unknown entity: leave it as-is
     },
   );
 }
@@ -264,9 +262,8 @@ function htmlUnescape(s: string): string {
 // ── Text helpers ───────────────────────────────────────────────────────────────
 
 /**
- * Python `str.splitlines()`: splits on universal line boundaries and, unlike
- * `str.split("\n")`, produces NO trailing empty element when the string ends with
- * a boundary. `"a\n".splitlines() == ["a"]`, `"".splitlines() == []`.
+ * Split on universal line boundaries, producing NO trailing empty element when
+ * the string ends with a boundary ("a\n" → ["a"], "" → []).
  */
 function splitlines(s: string): string[] {
   if (s === "") return [];
@@ -278,15 +275,14 @@ function splitlines(s: string): string[] {
 /** HTML to text: strip script/style, turn breaks into newlines, drop
  *  remaining tags, unescape entities. */
 function htmlToText(markup: string): string {
-  // (?is)<(style|script).*?</\1> — DOTALL + IGNORECASE, non-greedy, backreference.
+  // Non-greedy and case-insensitive, spanning newlines; \1 closes the same tag.
   let m = markup.replace(/<(style|script)[\s\S]*?<\/\1>/gi, " ");
   m = m.replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n");
   return htmlUnescape(m.replace(TAG_RE, " "));
 }
 
-// The Python whitespace set (see lib/text.ts for the full definition): C1
-// separators and NEL are stripped, the BOM is not — a leading BOM must survive
-// into the record text.
+// The whitespace set shared with lib/text.ts: C1 separators and NEL are
+// stripped, the BOM is not — a leading BOM must survive into the record text.
 const PY_WS =
   "\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
 const PY_LSTRIP_RE = new RegExp(`^[${PY_WS}]+`);
@@ -311,14 +307,12 @@ function clean(textIn: string): string {
   return pyStrip(text);
 }
 
-// Under `email.policy.default`, `msg.get("Date")` returns a header whose string
-// value is the RE-SERIALIZED date: fields zero-padded, weekday recomputed from the
-// calendar date, the ORIGINAL wall-clock time and UTC offset preserved (no
-// conversion), named/obsolete zones mapped to a numeric offset, trailing comments
-// dropped, and — when the value cannot be parsed — the raw string returned as-is.
-// This mirrors `email.utils.format_datetime(email.utils.parsedate_to_datetime(v))`
-// with its raise→raw fallback, verified against real archives (e.g. a raw
-// "Thu, 4 Jun 2026 …" is emitted as "Thu, 04 Jun 2026 …").
+// A Date header is NORMALIZED, not passed through: fields zero-padded, weekday
+// recomputed from the calendar date, the ORIGINAL wall-clock time and UTC offset
+// preserved (no conversion), named/obsolete zones mapped to a numeric offset,
+// trailing comments dropped — and, when the value cannot be parsed, the raw
+// string returned as-is (e.g. a raw "Thu, 4 Jun 2026 …" is emitted as
+// "Thu, 04 Jun 2026 …").
 const DATE_MONTHS: Record<string, number> = {
   jan: 0,
   feb: 1,
@@ -396,7 +390,7 @@ function formatEmailDate(raw: string): string {
 }
 
 /** From address: lowercase the From value, take the address between the
- *  last "<" and ">". The rstrip(">")-then-strip() order is preserved. */
+ *  last "<" and ">", dropping any trailing ">" run before trimming. */
 function fromAddr(fromValue: string): string {
   const f = fromValue.toLowerCase();
   if (f.includes("<")) {
@@ -405,7 +399,7 @@ function fromAddr(fromValue: string): string {
   return f.trim();
 }
 
-// ── Minimal MIME parser (ports the subset of Python's `email` this stage uses) ──
+// ── Minimal MIME parser — the subset of MIME this stage uses ───────────────────
 
 interface MimeNode {
   contentType: string; // lowercased "type/subtype"; default "text/plain"
@@ -503,8 +497,8 @@ function parseHeaders(
 }
 
 /** Split a multipart body [start,end) into child [start,end) ranges on `boundary`,
- *  matching RFC 2046 / Python's parser: the CRLF preceding a delimiter belongs to
- *  the delimiter, so it is excluded from the preceding part. */
+ *  per RFC 2046: the CRLF preceding a delimiter belongs to the delimiter, so it
+ *  is excluded from the preceding part. */
 function splitParts(
   buf: Buffer,
   start: number,
@@ -581,12 +575,12 @@ function parseNode(buf: Buffer, start: number, end: number): MimeNode {
 }
 
 function isAttachment(node: MimeNode): boolean {
-  return node.disposition === "attachment"; // Python EmailMessage.is_attachment()
+  return node.disposition === "attachment";
 }
 
 /**
- * Port of `EmailMessage.get_body(preferencelist=("plain","html"))`: walk the tree
- * for non-attachment text parts, yielding (preference index, part); the FIRST part
+ * Pick the body part, preferring plain over html: walk the tree for
+ * non-attachment text parts, collecting (preference index, part); the FIRST part
  * with the lowest index wins (plain beats html; first plain short-circuits).
  */
 function getBody(root: MimeNode): MimeNode | null {
@@ -629,7 +623,8 @@ function getBody(root: MimeNode): MimeNode | null {
   return body;
 }
 
-/** Port of `binascii.a2b_qp` (header=False): decode quoted-printable bytes. */
+/** Decode quoted-printable bytes: soft breaks dropped, `=XX` pairs decoded, a
+ *  lone `=` kept literally. */
 function decodeQuotedPrintable(raw: Buffer): Buffer {
   const out: number[] = [];
   const n = raw.length;
@@ -665,7 +660,7 @@ function decodeQuotedPrintable(raw: Buffer): Buffer {
   return Buffer.from(out);
 }
 
-/** Port of `get_payload(decode=True)`: transfer-decode the leaf part to bytes. */
+/** Transfer-decode the leaf part to bytes (base64, quoted-printable, or raw). */
 function transferDecode(buf: Buffer, node: MimeNode): Buffer {
   const raw = buf.subarray(node.bodyStart, node.bodyEnd);
   if (node.cte === "base64")
@@ -674,13 +669,13 @@ function transferDecode(buf: Buffer, node: MimeNode): Buffer {
   return raw; // 7bit / 8bit / binary / none → raw bytes
 }
 
-/** Port of the raw_data_manager `get_content()` for a text part: transfer-decode,
- *  then charset-decode with replacement (Python default charset "ASCII"). */
+/** Body text of a part: transfer-decode, then charset-decode with replacement;
+ *  an unknown charset falls back to ASCII. */
 function getContent(buf: Buffer, node: MimeNode): string {
   const bytes = transferDecode(buf, node);
   let charset = node.charset || "ASCII";
   if (!iconv.encodingExists(charset)) charset = "ASCII";
-  // Python's bytes.decode keeps a leading BOM; iconv-lite strips it unless told not to.
+  // Keep a leading BOM; iconv-lite strips it unless told not to.
   return iconv.decode(bytes, charset, { stripBOM: false });
 }
 
@@ -701,11 +696,10 @@ function bodyText(buf: Buffer, root: MimeNode): string {
 // ── mbox splitting ──────────────────────────────────────────────────────────────
 
 /**
- * Split raw mbox bytes into per-message byte slices, matching Python's
- * `mailbox.mbox`: every line beginning with "From " (at column 0) starts a new
- * message, that "From " envelope line is dropped, and a message's content runs to
- * the start of the next "From " line. Content before the first "From " line (if
- * any) belongs to no message, exactly as `_generate_toc` discards it.
+ * Split raw mbox bytes into per-message byte slices: every line beginning with
+ * "From " (at column 0) starts a new message, that "From " envelope line is
+ * dropped, and a message's content runs to the start of the next "From " line.
+ * Content before the first "From " line (if any) belongs to no message.
  */
 function splitMbox(buf: Buffer): [number, number][] {
   const isFromAt = (pos: number): boolean =>
@@ -735,16 +729,15 @@ function splitMbox(buf: Buffer): [number, number][] {
 
 // ── Outlook .olm archives (a ZIP of per-message XML files) ──────────────────────
 //
-// Python's ElementTree is the spec; Node has no built-in XML parser and no XML
-// dependency is available, so this is a compact scanner replicating exactly the
-// two required operations: pre-order search for the first element whose tag NAME
-// contains a needle, returning that element's text (else its first non-empty
-// attribute value). It resolves the five predefined XML entities and numeric refs,
-// and reads CDATA literally. DIVERGENCE from ElementTree:
-// ElementTree would RAISE on malformed XML (and a strict reader then skips that
-// message) whereas this scanner is lenient; and mixed-content nuances (comments
-// splitting text into .text/.tail, namespaces, DTD entities) are not modelled.
-// This path only runs when *.olm files are present.
+// Node has no built-in XML parser and no XML dependency is available, so this
+// is a compact scanner doing exactly the two required operations: pre-order
+// search for the first element whose tag NAME contains a needle, returning
+// that element's text (else its first non-empty attribute value). It resolves
+// the five predefined XML entities and numeric refs, and reads CDATA
+// literally. It is LENIENT where a conforming XML parser would reject the
+// document (and a strict reader would then skip that message), and
+// mixed-content nuances (comments splitting text, namespaces, DTD entities)
+// are not modelled. This path only runs when *.olm files are present.
 
 function xmlUnescape(s: string): string {
   return s.replace(
@@ -792,7 +785,7 @@ function readElementText(xml: string, pos: number): string {
         }
         continue;
       }
-      break; // a start tag, end tag, comment or PI terminates .text
+      break; // a start tag, end tag, comment or PI terminates the text
     }
     const lt = xml.indexOf("<", i);
     const chunkEnd = lt < 0 ? xml.length : lt;
@@ -906,7 +899,7 @@ function iterOlmMessages(inbox: string): OlmRow[] {
 
 // ── mbox discovery ─────────────────────────────────────────────────────────────
 
-/** Python `Path.stem`: filename with its LAST suffix removed. */
+/** Filename with its LAST suffix removed. */
 function stemOf(file: string): string {
   const base = path.basename(file);
   const ext = path.extname(base);
@@ -1019,12 +1012,11 @@ interface MboxMessage {
 }
 
 /**
- * Universal-newline translation (\r\n and lone \r → \n): `email.message_from_binary_file`
- * reads through a `TextIOWrapper` in universal-newlines mode, so the ENTIRE message (headers,
- * boundaries and bodies) is LF-normalized before parsing. Matching this is what
- * makes the `"\n-- \n"` signature split and per-line quote stripping line up.
- * (Encoded newlines like a quoted-printable "=0D=0A" are ordinary
- * characters here and survive to decode as CRLF, exactly as in Python.)
+ * Universal-newline translation (\r\n and lone \r → \n): the ENTIRE message
+ * (headers, boundaries and bodies) is LF-normalized before parsing, which is
+ * what makes the `"\n-- \n"` signature split and per-line quote stripping
+ * line up. (Encoded newlines like a quoted-printable "=0D=0A" are ordinary
+ * characters here and survive transfer-decoding as CRLF.)
  */
 function normalizeNewlines(buf: Buffer): Buffer {
   const out = Buffer.allocUnsafe(buf.length);
@@ -1141,8 +1133,8 @@ export function runIngestEmail(_argv: string[]): number {
     }
   }
 
-  // The output is opened with mode "w" semantics (truncating even
-  // when nothing is written); write once here for the same net effect.
+  // The output is recreated (truncated) even when nothing is written;
+  // write once here for the same net effect.
   fs.mkdirSync(corpus, { recursive: true });
   // The same letter reaches a mailbox more than once: sent to several
   // recipients, or saved as draft, redraft and sent copy. Each would weight

@@ -16,20 +16,14 @@ register-aware voice profiles from your own writing — chat transcripts, export
 posts — preserves your quirk-level habits with enforcement rules a model can't
 drift away from, and scores every output for how much it actually sounds like you.
 
-This is the Node/TypeScript implementation, distributed on npm and runnable with
-`npx`. The tool began life as a Python pipeline and was ported to TypeScript
-with stage-by-stage output verification at cutover; the porting harness was
-removed once the port was proven.
-
 **Status: working end to end, with named rough edges.** The corpus pipeline —
 extraction, curation, register tagging, chat/email ingest, stylometric
 fingerprints — and the output side both run today: `rewrite` (a model pass
 over your own claude CLI or Anthropic API credentials, then the deterministic
 enforcement pass), `score` (the model-free fidelity v1, plus the model-judged
 half via `score --judge`), `blind` self-tests, and the local web app
-(`serve`). Still open: score calibration, fingerprint refinements (sentence
-splitting, email quote-fragment cleanup, per-register typo rate), and the
-`--typos natural` rewrite mode — see the [roadmap](ROADMAP.md).
+(`serve`). Still open: score calibration and email quote-fragment cleanup; see
+the [roadmap](#roadmap).
 
 ## What it does
 
@@ -44,7 +38,8 @@ splitting, email quote-fragment cleanup, per-register typo rate), and the
   models normalize personal quirks away and drift from style instructions as
   context grows.
 - **A fidelity score** — every output gets a "how-much-like-you" number
-  (stylometric match plus a judge rubric), calibrated by blind self-tests.
+  (stylometric match plus a judge rubric), checked by blind self-tests; its
+  calibration is still open.
 
 ## Quick start
 
@@ -73,9 +68,10 @@ It is never mined for word choice and never transliterated.
 
 ## Privacy by design
 
-Your corpus and profiles never leave your machine: `corpus/` and `profiles/` are
-gitignored, nothing is transmitted anywhere, and model calls (for the rewrite
-stage) use your own credentials.
+Your corpus and profiles stay on your machine: `corpus/` and `profiles/` are
+gitignored and never uploaded. The one thing that leaves it is a rewrite or judge
+call: the draft and the profile's style guidance go to the backend you chose (your
+`claude` CLI or your Anthropic API key), under your own credentials.
 
 ## Development
 
@@ -85,7 +81,17 @@ npm test          # unit tests
 npm run build     # bundle to dist/ (the published CLI)
 ```
 
-Roadmap: [ROADMAP.md](ROADMAP.md) · Decisions: [DECISIONS.md](DECISIONS.md)
+The git hooks under `.githooks/` and the `.etymd/` config come from
+[etymd](https://www.npmjs.com/package/etymd) and do nothing where it is not installed;
+`.githooks/*.local` runs a gitignored `local/` directory for machine-specific checks.
+The design record is [docs/decisions.md](docs/decisions.md).
+
+## Roadmap
+
+- Score calibration: tie the fidelity number to blind-test verdicts.
+- Email ingest: remove the remaining quoted-reply fragments.
+- More output registers and per-audience presets.
+- Era-weighted profiles, with text written before AI assistants as the anchor.
 
 ## License
 

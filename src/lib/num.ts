@@ -1,21 +1,22 @@
 /**
- * Numeric helpers with Python-matching semantics — the tool's outputs depend
- * on these being exact, so the differences from the JS defaults are deliberate:
+ * Numeric helpers — the tool's outputs depend on these being exact, so the
+ * differences from the JS defaults are deliberate:
  *
- * - `pyRound` reproduces Python's round-half-to-even ("banker's rounding");
- *   `Math.round` rounds half up, which would drift every stylometric ratio.
+ * - `pyRound` rounds half to even ("banker's rounding"); `Math.round` rounds
+ *   half up, which would drift every stylometric ratio.
  * - `median` returns the average of the two middle values for an even-length
- *   input (matching `statistics.median`), which can be a fractional number.
+ *   input, which can be a fractional number.
  */
 
 /**
- * Python 3 `round(x, ndigits)` — round half to even, on the TRUE binary value.
+ * Round half to even, on the TRUE binary value.
  *
- * CPython rounds the actual double (e.g. 2.675 is really 2.67499999…, so
- * `round(2.675, 2)` is 2.67), not the naive `x * 10**n` product — which would
- * round the multiply's own error up to 267.5 and give the wrong answer. So we
- * expand the double to far more decimal places than it is significant, then round
- * that decimal string half-to-even. BigInt keeps the final increment exact.
+ * The actual double is rounded (e.g. 2.675 is really 2.67499999…, so
+ * `pyRound(2.675, 2)` is 2.67), never the naive `x * 10**n` product — whose
+ * own rounding error can turn 2.67499999… into exactly 267.5, a false tie
+ * that rounds up to the wrong answer. So we expand the double to far more
+ * decimal places than it is significant, then round that decimal string
+ * half-to-even. BigInt keeps the final increment exact.
  */
 export function pyRound(x: number, ndigits = 0): number {
   if (!Number.isFinite(x)) return x;
@@ -52,7 +53,7 @@ export function pyRound(x: number, ndigits = 0): number {
   return neg ? -val : val;
 }
 
-/** Arithmetic mean (matches `statistics.mean` for the numeric ranges used). */
+/** Arithmetic mean. */
 export function mean(xs: number[]): number {
   if (xs.length === 0) throw new Error("mean() of empty sequence");
   let s = 0;
@@ -60,7 +61,7 @@ export function mean(xs: number[]): number {
   return s / xs.length;
 }
 
-/** Median matching `statistics.median` (even length → average of the two middle). */
+/** Median (even length → average of the two middle values). */
 export function median(xs: number[]): number {
   if (xs.length === 0) throw new Error("median() of empty sequence");
   const s = [...xs].sort((a, b) => a - b);

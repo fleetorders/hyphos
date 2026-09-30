@@ -1,24 +1,25 @@
 /**
- * Deterministic quirk-enforcement engine (D-003: the post-model pass).
+ * Deterministic quirk-enforcement engine (docs/decisions.md, D-003 — the
+ * post-model pass).
  *
  * Every content-adaptation operation is a declared rule with an id, a kind, a
  * regular-expression pattern (word/token lists instead, for `banned` rules),
  * and its own test cases. The engine applies the rules in listed order
  * (deterministic), reports per-rule counts, and the self-test verifies every
  * rule against its cases. The built-in patterns and
- * their order are stable, except the em-dash rewrite family (pair/single/tight),
- * dropped in D-011: dash usage is voice data, not
- * deterministic substitution — the banned surface may still FLAG a dash
- * (D-016); it never rewrites one. A rule whose pattern is missing, empty, or
- * zero-width is inert (see matchesEmpty below).
+ * their order are stable, except that no em-dash rewrite family
+ * (pair/single/tight) exists: dash usage is voice data, not deterministic
+ * substitution (docs/decisions.md, D-011) — the banned surface may still FLAG
+ * a dash (docs/decisions.md, D-016); it never rewrites one. A rule whose
+ * pattern is missing, empty, or zero-width is inert (see matchesEmpty below).
  *
- * Regex semantics match Python's `re`:
- *  - `remove`/`replace` rules run case-sensitively (Python uses `re.subn` with no
- *    flags); `flag` rules count case-insensitively (Python `re.findall(..., re.I)`).
- *  - Patterns keep Python's ASCII `\w`/`\b` behaviour (JavaScript's defaults),
- *    which is what the English-oriented model-ism rules target.
- *  - `replace` replacement strings use Python-style `\1` back-references, expanded
- *    manually so `$` stays literal (Python does not treat it specially).
+ * Regex semantics:
+ *  - `remove`/`replace` rules run case-sensitively; `flag` rules count
+ *    case-insensitively.
+ *  - Patterns rely on ASCII `\w`/`\b` behaviour (JavaScript's defaults), which
+ *    is what the English-oriented model-ism rules target.
+ *  - `replace` replacement strings use `\1` back-references, expanded manually
+ *    so `$` stays literal.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -79,7 +80,7 @@ export const RULES: Rule[] = [
     id: "flattery-standalone",
     kind: "remove",
     // standalone sentence only — mid-clause occurrences are flagged, not
-    // amputated (learned from a dangling "to prioritize it." in testing)
+    // amputated (removing text mid-sentence would leave a dangling fragment)
     pattern: "You(?:'|’)re absolutely (?:right|correct)[.!]\\s*",
     tests: [
       { in: "You're absolutely right. Next point.", out: "Next point." },
@@ -126,11 +127,12 @@ export const RULES: Rule[] = [
     // EMPTY on purpose — which words a writer avoids is personal, not a
     // model-ism, so nothing belongs here. The personal overlay
     // (profiles/rules.json) fills this slot by overriding the id — with
-    // `words`, and with `tokens` for non-word marks (the em-dash, D-016),
-    // carried once there for every register; a register extends the WORDS
+    // `words`, and with `tokens` for non-word marks (the em-dash;
+    // docs/decisions.md, D-016), carried once there for every register; a
+    // register extends the WORDS
     // via profiles/<register>/banned.json (see loadRules).
-    // Flag-only — amputating a mid-sentence occurrence mangles meaning, the
-    // same lesson as flattery-standalone above.
+    // Flag-only — amputating a mid-sentence occurrence mangles meaning, which
+    // is exactly why flattery-standalone matches whole sentences only.
     id: "banned-words",
     kind: "banned",
     words: [],
@@ -139,7 +141,7 @@ export const RULES: Rule[] = [
 ];
 
 // Whole-pipeline fixtures: exercise `enforce` end to end, not one rule.
-// The em-dash family is deliberately absent (dropped 2026-08-17, D-011): dash
+// The em-dash family is deliberately absent (docs/decisions.md, D-011): dash
 // usage follows the voice profile's data — typed text carries almost none
 // and the fidelity score already measures `emdash_per_1k` — so
 // the fixture pins that dashes pass through the deterministic pass untouched.
@@ -217,8 +219,8 @@ export function loadRules(register?: string): Rule[] {
   return rules;
 }
 
-// Expand a Python-style replacement string (\1..\9, \g<n>, \\) against the
-// match's capture groups. Anything else, including `$`, is copied literally.
+// Expand a replacement string (\1..\9, \g<n>, \\) against the match's capture
+// groups. Anything else, including `$`, is copied literally.
 function expandReplacement(
   repl: string,
   match: string,
@@ -258,7 +260,7 @@ function expandReplacement(
   return out;
 }
 
-// Global substitution returning [newText, substitutionCount], like `re.subn`.
+// Global substitution returning [newText, substitutionCount].
 function subn(re: RegExp, replacement: string, text: string): [string, number] {
   let count = 0;
   const out = text.replace(re, (...args: unknown[]) => {
@@ -282,11 +284,9 @@ function escapeRe(word: string): string {
 // A pattern that can match the empty string — a missing `pattern` field, an
 // empty word entry, a zero-width regex like `x*` — compiles to a global
 // regex that fires at EVERY position of the text, so the rule's count
-// becomes the text's length + 1 while the text itself stays unchanged (the
-// regression of 2026-08-31: a banned-words entry from a newer overlay,
-// running on an engine without the `banned` kind, fell through to
-// `new RegExp(undefined)`). Such a rule is inert: it fires on nothing
-// rather than on everything. The guard cases in GUARD_FIXTURES pin this.
+// becomes the text's length + 1 while the text itself stays unchanged. Such
+// a rule is inert: it fires on nothing rather than on everything. The guard
+// cases in GUARD_FIXTURES pin this.
 function matchesEmpty(re: RegExp): boolean {
   return new RegExp(re.source, re.flags.replace("g", "")).test("");
 }
@@ -361,8 +361,8 @@ export function enforce(
   return [text, report];
 }
 
-// Best-effort Python `repr()` for the failure diagnostics below (single-quoted,
-// matching CPython's preference). Only printed when a test fails.
+// Single-quoted literal rendering for the failure diagnostics below. Only
+// printed when a test fails.
 function pyRepr(s: string): string {
   const hasSingle = s.includes("'");
   const hasDouble = s.includes('"');

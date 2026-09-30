@@ -12,8 +12,7 @@
  *
  * Two Meta quirks are handled:
  * - The mojibake: Meta writes UTF-8 bytes escaped as latin-1, so Greek (and
- *   emoji) arrive double-encoded. Undone per string via the shared `demojibake`,
- *   which reproduces Python's decode-with-fallback exactly.
+ *   emoji) arrive double-encoded. Undone per string via the shared `demojibake`.
  * - Reactions/system rows have no `content` — skipped.
  *
  * Messages are language-tagged per chunk (`splitByLang`): English feeds the
@@ -30,11 +29,11 @@ import { splitByLang, type Lang } from "../lib/lang.js";
 import { corpusDir } from "../lib/paths.js";
 import { dropNearDuplicateLines } from "../lib/dedupe.js";
 
-// `re.compile(r"https?://\S+")` — a run of non-whitespace after the scheme.
+// A URL: the scheme, then a run of non-whitespace.
 const URL_RE = /https?:\/\/\S+/gu;
-// `re.search(r"(inbox|messages)/.+/message_\d+\.json$")` over each zip entry name.
+// A Meta thread file inside a zip: `.../(inbox|messages)/<thread>/message_<n>.json`.
 const ENTRY_RE = /(inbox|messages)\/.+\/message_\d+\.json$/;
-// `INBOX.glob("message_*.json")` — bare thread files dropped directly in inbox.
+// Bare thread files dropped directly in the inbox.
 const BARE_FILE_RE = /^message_.*\.json$/;
 
 // Export archives arrive date-and-hash-stamped (facebook-<user>-<date>-<id>); the
@@ -56,7 +55,7 @@ function sourceName(stem: string): string {
   return stem;
 }
 
-/** `Path(name).stem` — the filename with its final suffix removed. */
+/** The filename with its final suffix removed. */
 function zipStem(name: string): string {
   const ext = path.extname(name);
   return ext ? name.slice(0, name.length - ext.length) : name;
@@ -68,8 +67,7 @@ type ThreadEntry = [string, Record<string, unknown>];
  * Yield `[source, thread]` for every Meta message file found, in a fixed
  * order: all `*.zip` archives first (sorted by name), then bare `message_*.json`
  * files (sorted). Within a zip, entries are visited in stored (central-directory)
- * order to match Python's `zf.namelist()` — adm-zip only sorts on write, and
- * `noSort` keeps that guarantee explicit.
+ * order — adm-zip otherwise sorts on write, and `noSort` disables that.
  *
  * The archive open is deliberately UNGUARDED: a corrupt or
  * non-zip `*.zip` file raises and aborts the run rather than being silently
@@ -77,7 +75,7 @@ type ThreadEntry = [string, Record<string, unknown>];
  */
 function iterThreads(inbox: string): ThreadEntry[] {
   const out: ThreadEntry[] = [];
-  // `Path.glob` on a missing directory yields nothing (no error).
+  // A missing directory yields no entries (no error).
   if (!fs.existsSync(inbox)) return out;
   const names = fs.readdirSync(inbox);
 
@@ -111,18 +109,15 @@ function iterThreads(inbox: string): ThreadEntry[] {
 }
 
 /**
- * Serialize one JSONL record in the canonical format:
- *   `json.dumps({...}, ensure_ascii=False)` semantics.
+ * Serialize one JSONL record in the canonical corpus line format: a SPACE
+ * after every comma and colon.
  *
- * FORMAT NOTE: the corpus line format follows `json.dumps` with neither
- * `indent` nor `separators` — the defaults `(", ", ": ")`, a SPACE after every
- * comma and colon. A bare `JSON.stringify(obj)` emits none of those spaces, so
- * the line is assembled with the same
- * separators and the same key order (ts, source, lang, words, text). Each value
- * still goes through `JSON.stringify`, whose string escaping matches
- * `json.dumps(ensure_ascii=False)` for realistic text (short control-char forms
- * like \n/\t, literal non-ASCII, escaped `"` and `\`). Numbers/`null` likewise
- * render identically for integer timestamps and word counts.
+ * FORMAT NOTE: a bare `JSON.stringify(obj)` emits none of those spaces, so the
+ * line is assembled with the fixed separators and key order (ts, source, lang,
+ * words, text). Each value still goes through `JSON.stringify`, whose string
+ * escaping (short control-char forms like \n/\t, literal non-ASCII, escaped
+ * `"` and `\`) is the format's own. Numbers/`null` likewise render in their
+ * usual form for integer timestamps and word counts.
  */
 function jsonlLine(
   ts: unknown,
@@ -131,7 +126,7 @@ function jsonlLine(
   words: number,
   text: string,
 ): string {
-  const tsJson = JSON.stringify(ts ?? null); // undefined/None → null
+  const tsJson = JSON.stringify(ts ?? null); // undefined → null
   return (
     `{"ts": ${tsJson}, "source": ${JSON.stringify(source)}, ` +
     `"lang": ${JSON.stringify(lang)}, "words": ${words}, ` +
@@ -173,11 +168,9 @@ export function runIngestChat(argv: string[]): number {
       `threads (override with CHAT_OWNER_NAME)\n`,
   );
 
-  // One open file handle per source, created (and truncated) the first time a
-  // thread of that source is seen — so a source that contributes no kept
-  // messages still leaves an empty chat-<source>.jsonl.
-  // Buffered per source rather than streamed, because a duplicate can only be
-  // recognised against the rest of the source.
+  // Lines are buffered per source and written once at the end: a duplicate
+  // can only be recognised against the rest of the source, and a source with
+  // no kept messages still leaves an empty chat-<source>.jsonl behind.
   const bySource = new Map<string, string[]>();
   let kept = 0;
   const wordsByLang = new Map<Lang, number>();
@@ -215,7 +208,6 @@ export function runIngestChat(argv: string[]): number {
     }
   }
 
-  // A source that contributes no kept messages still leaves an empty file.
   let deduped = 0;
   for (const [source, buf] of bySource) {
     const r = dropNearDuplicateLines(buf);
@@ -231,7 +223,7 @@ export function runIngestChat(argv: string[]): number {
     `kept: ${kept} messages (owner only; ${droppedOthers} others dropped, ` +
       `${deduped} duplicates)\n`,
   );
-  // sorted(words_by_lang.items()) — by language tag, in code-point order.
+  // By language tag, in code-point order.
   const langs = [...wordsByLang.keys()].sort((a, b) =>
     a < b ? -1 : a > b ? 1 : 0,
   );

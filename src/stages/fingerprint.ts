@@ -1,5 +1,5 @@
 /**
- * Stage 1b — stylometric fingerprints per register bucket. Model-free
+ * Stage 2 — stylometric fingerprints per register bucket. Model-free
  * measurements of how the user writes; all numeric behavior goes through the
  * shared helpers in ../lib.
  *
@@ -98,12 +98,13 @@ function countOccurrences(haystack: string, needle: string): number {
   return n;
 }
 
-// Python str.isupper(): at least one cased char, and no lowercase cased chars.
+// At least one cased char, and no lowercase ones (digits/punctuation alone do
+// not count).
 function isUpperPy(w: string): boolean {
   return w !== w.toLowerCase() && w === w.toUpperCase();
 }
 
-// Python str.islower() for the leading char: a cased char that is lowercase.
+// The leading char is cased and lowercase (a digit or mark does not count).
 function firstCharIsLower(s: string): boolean {
   const c = s.slice(0, 1);
   return c.length > 0 && c === c.toLowerCase() && c !== c.toUpperCase();
@@ -207,9 +208,9 @@ export function fingerprint(texts: string[]): Fingerprint {
     emoji += (t.match(EMOJI_RE) ?? []).length;
     contractions += (t.match(CONTRACTION_RE) ?? []).length;
     ellipses += (t.match(ELLIPSIS_RE) ?? []).length;
-    // Add every connector in list order (k may be 0) — Python's `counter[c] += k`
-    // creates each key even at zero, so the canonical list order is the tie-break
-    // for most_common. The zero entries are filtered from the OUTPUT below, not
+    // Add every connector in list order (k may be 0) — each key is created
+    // even at zero, so the canonical list order is the tie-break for
+    // most_common. The zero entries are filtered from the OUTPUT below, not
     // from the ranking population.
     for (const c of CONNECTORS) {
       let k = 0;
@@ -259,18 +260,18 @@ function rhythmOnly(fp: Fingerprint): Record<string, unknown> {
   const src = fp as unknown as Record<string, unknown>;
   for (const k of RHYTHM_KEYS) if (k in fp) r[k] = src[k];
   r["signal"] =
-    "rhythm-only (D-004: non-English contributes rhythm, never vocabulary)";
+    "rhythm-only (non-English contributes rhythm, never vocabulary)";
   return r;
 }
 
 /**
  * The year a record was written, whatever shape its timestamp arrived in.
  *
- * The year buckets are not an email feature, but only the mail ingest wrote a
- * timestamp this could read: a bare four-digit token, as RFC-5322 has. Chat
- * sources write epoch milliseconds and the session sources write ISO-8601, so
- * for them the split silently never happened and no `-pre2023` or `-recent`
- * profile was ever built — the one place a voice's drift over time is visible.
+ * The sources write three timestamp shapes — ISO-8601 (session extract), a
+ * bare four-digit year (RFC-5322 mail), epoch seconds or milliseconds (chat)
+ * — and each must resolve to a year, or the period split (`-pre2023` /
+ * `-recent`) never happens for that record and the voice's drift over time
+ * stays invisible.
  */
 export function recordYear(ts: string): number | null {
   const t = ts.trim();
@@ -299,7 +300,7 @@ function readJsonl(file: string): Record<string, unknown>[] {
   return out;
 }
 
-/** Python `json.dumps(obj, ensure_ascii=False, indent=1)` — 1-space indent. */
+/** One-space-indented JSON with literal non-ASCII. */
 function dumpJson(obj: unknown): string {
   return JSON.stringify(obj, null, 1);
 }

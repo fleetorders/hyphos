@@ -1,8 +1,8 @@
 /**
  * Stage 0b — curate the raw corpus down to genuinely typed text.
  *
- * The rules are evidence-based (measured on a real corpus): messages that stay
- * long after machine text is stripped are almost always pasted, not typed, so
+ * The rules are evidence-based: messages that stay long after machine text is
+ * stripped are almost always pasted, not typed, so
  * they are not the author's voice. The pipeline strips fenced code blocks,
  * log-like lines, and lines carrying very long tokens (paths, hashes, URLs),
  * recounts words, keeps messages of 1–400 words, and quarantines the rest for a
@@ -18,40 +18,40 @@ import { corpusDir } from "../lib/paths.js";
 import { whitespaceSplit } from "../lib/text.js";
 import { dropNearDuplicateLines } from "../lib/dedupe.js";
 
-// Fenced code block, non-greedy, DOTALL — `[\s\S]` matches newlines like Python
-// `re.S`. Global so every block is removed (Python `re.sub` replaces all).
+// Fenced code block, non-greedy; `[\s\S]` spans newlines. Global so every
+// block is removed.
 const FENCE_RE = /```[\s\S]*?```/g;
 const IMAGE_RE = /\[Image:[^\]]*\]/g;
 // A run of 40+ non-whitespace characters (a path/hash/URL). The `u` flag makes
-// the `{40,}` quantifier count code points, matching Python's `\S{40,}` on a
-// `str` — without it an astral char (emoji) would count as two UTF-16 units.
+// the `{40,}` quantifier count code points — without it an astral char (emoji)
+// would count as two UTF-16 units.
 const LONG_TOKEN_RE = /\S{40,}/u;
-// A line that looks machine-emitted. Anchored at the start like Python's
-// `re.match`. `\p{Nd}` stands in for Python's Unicode-aware `\d` (JS `\d` is
-// ASCII-only); the `u` flag is required for the property escape.
+// A line that looks machine-emitted, anchored at the start. `\p{Nd}` matches
+// Unicode decimal digits (a plain `\d` is ASCII-only); the `u` flag is
+// required for the property escape.
 const LOG_LINE_RE =
   /^\s*(at |Error|error:|Traceback|\$ |> |\| |#|\/\/|\p{Nd}+[:.]\p{Nd}|\p{Nd}{1,4}[/-]\p{Nd}{1,2}[/-]\p{Nd}{1,4})/u;
-// Collapse runs of spaces/tabs to a single space (Python `re.sub(r"[ \t]+", " ")`).
+// Collapse runs of spaces/tabs to a single space.
 const COLLAPSE_RE = /[ \t]+/g;
 const MAX_TYPED_WORDS = 400;
 
-// Line boundaries recognised by Python `str.splitlines()`: LF, CR, CRLF, VT, FF,
-// FS, GS, RS, NEL, LS, PS. Broader than a plain `\n` split, so replicated exactly.
+// Line boundaries: LF, CR, CRLF, VT, FF, FS, GS, RS, NEL, LS, PS. Broader than
+// a plain `\n` split, so the exact set is spelled out.
 const LINE_BOUNDARY_RE = /\r\n|[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]/g;
 
-// Characters Python's argument-less `str.strip()` removes (where `c.isspace()`).
-// Differs from JS `String.prototype.trim()`: this set includes FS/GS/RS/US and
-// NEL but NOT the BOM (U+FEFF), matching Python — so a leading BOM is preserved.
+// Characters stripped from both ends. Differs from JS
+// `String.prototype.trim()`: this set includes FS/GS/RS/US and NEL but NOT the
+// BOM (U+FEFF) — so a leading BOM is preserved.
 const PY_WS =
   "\\t\\n\\v\\f\\r\\x1c\\x1d\\x1e\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
 const PY_STRIP_RE = new RegExp(`^[${PY_WS}]+|[${PY_WS}]+$`, "gu");
 
-/** Python `str.strip()` semantics, no argument. */
+/** Strip the whitespace set above from both ends. */
 function pyStrip(s: string): string {
   return s.replace(PY_STRIP_RE, "");
 }
 
-/** Python `str.splitlines()` semantics (no keepends). */
+/** Split on the line boundaries above, without the boundaries themselves. */
 function pySplitlines(s: string): string[] {
   if (s.length === 0) return [];
   const parts: string[] = [];
@@ -62,12 +62,12 @@ function pySplitlines(s: string): string[] {
     parts.push(s.slice(last, m.index));
     last = m.index + m[0].length;
   }
-  // No trailing empty element when the text ends on a boundary (Python behaviour).
+  // No trailing empty element when the text ends on a boundary.
   if (last < s.length) parts.push(s.slice(last));
   return parts;
 }
 
-/** Count non-overlapping occurrences of `needle` — Python `str.count`. */
+/** Count non-overlapping occurrences of `needle`. */
 function countOccurrences(haystack: string, needle: string): number {
   if (needle.length === 0) return 0;
   let n = 0;
@@ -132,8 +132,8 @@ export function runCurate(argv: string[]): number {
       droppedEmpty++;
       continue;
     }
-    // `stripped` is already whitespace-stripped, so its first char is the
-    // `stripped.lstrip()[:1]` value. Drop unfenced JSON/config pastes.
+    // `stripped` is already whitespace-stripped, so its first char is the first
+    // non-whitespace character. Drop unfenced JSON/config pastes.
     const first = stripped.slice(0, 1);
     if (
       (first === "{" || first === "[") &&
@@ -142,11 +142,11 @@ export function runCurate(argv: string[]): number {
       droppedEmpty++;
       continue;
     }
-    // Reassigning `text`/`words` keeps their original position (both Python dict
-    // and JS object semantics); `raw_words` is appended last.
+    // Reassigning `text`/`words` keeps their original key position (object
+    // spread preserves insertion order); `raw_words` is appended last.
     const rec = { ...o, text: stripped, words: wordCount, raw_words: o.words };
-    // Deliberate: a message carrying an
-    // em-dash is excluded from the voice corpus entirely. Typed text carries
+    // Deliberate: a message carrying an em-dash is excluded from the voice
+    // corpus entirely. Typed text carries
     // almost none of them, so a message that contains one is pasted or
     // AI-influenced text riding in a user turn — under the length ceiling it
     // would otherwise pass straight into the fingerprints. These rows go to
@@ -171,8 +171,7 @@ export function runCurate(argv: string[]): number {
     }
   }
 
-  // All output files are (re)created even when empty (`open("w")` truncation
-  // semantics).
+  // All output files are (re)created even when empty.
 
   // One composition reaching the corpus several times — a prompt re-pasted
   // across sessions, a message quoted back and re-extracted — would speak that
