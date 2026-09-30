@@ -7,7 +7,7 @@
  * (deterministic), reports per-rule counts, and the self-test verifies every
  * rule against its cases. The built-in patterns and
  * their order are stable, except the em-dash rewrite family (pair/single/tight),
- * dropped by maintainer ruling (D-011): dash usage is voice data, not
+ * dropped in D-011: dash usage is voice data, not
  * deterministic substitution — the banned surface may still FLAG a dash
  * (D-016); it never rewrites one. A rule whose pattern is missing, empty, or
  * zero-width is inert (see matchesEmpty below).
@@ -140,8 +140,8 @@ export const RULES: Rule[] = [
 
 // Whole-pipeline fixtures: exercise `enforce` end to end, not one rule.
 // The em-dash family is deliberately absent (dropped 2026-08-17, D-011): dash
-// usage follows the voice profile's data — the maintainer's baseline is ~0
-// per 1k words and the fidelity score already measures `emdash_per_1k` — so
+// usage follows the voice profile's data — typed text carries almost none
+// and the fidelity score already measures `emdash_per_1k` — so
 // the fixture pins that dashes pass through the deterministic pass untouched.
 export const PIPELINE_FIXTURES: { in: string; out: string }[] = [
   { in: "Importantly, this — mostly — works.", out: "this — mostly — works." },

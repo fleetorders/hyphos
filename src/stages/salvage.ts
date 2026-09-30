@@ -95,9 +95,8 @@ function salvage(text: string): string | null {
   }
   const out = kept.join("\n\n");
   // Same guard as the curate stage, applied to the recovered fragment: the
-  // owner's typed baseline has ~0 em-dashes per 1k words, and the quarantined
-  // messages this pass mines are exactly where pasted AI text lives (measured
-  // before the guard: 17 of 44 salvaged rows carried one). Never recover such
+  // typed text carries almost no em-dashes, and the quarantined messages this
+  // pass mines are exactly where pasted AI text lives. Never recover such
   // a fragment as "typed".
   if (out.includes("—")) return null;
   return whitespaceSplit(out).length >= 8 ? out : null;

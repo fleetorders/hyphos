@@ -170,7 +170,7 @@ gate: zip entries must keep arriving in stored central-directory order
 that ordering was verified identical across the bump, so only the full parity
 run against the reference remains owed. adm-zip 0.6.0 bundles its own types,
 which drops @types/adm-zip. The semver-range advisory bumps (mailparser, tsup,
-tsx) travel with the pending advisory-sweep branch.
+tsx) follow separately.
 
 **Why:** the advisories needing major versions are exactly the two left after
 the within-semver sweep; vitest 4 clears the critical/high set in one jump on
@@ -186,9 +186,8 @@ replaces it in place — same position, its own replacement and tests — while
 entries with new ids keep appending after the built-ins. Appending alone made
 per-voice tuning unreachable for any pattern a built-in consumed first: an
 appended em-dash rule never saw an em-dash, because the built-ins had already
-rewritten them all to commas. The motivating retune is live in the
-maintainer's own overlay (untracked, per-install config): single and tight
-em-dash joins become `;`, while paired asides keep the built-in parentheses
+rewritten them all to commas. For example, an overlay (untracked,
+per-install config) can turn single and tight em-dash joins into `;`, while paired asides keep the built-in parentheses
 rewrite, since a semicolon does not fit a parenthetical.
 
 ### D-011 — Em-dash rewrites dropped from the registry; dash usage is voice data
@@ -197,8 +196,8 @@ rewrite, since a semicolon does not fit a parenthetical.
 
 The em-dash rewrite family (pair → parentheses, single/tight → comma) is
 removed from the rules registry entirely, and nothing substitutes it. Dash
-usage follows the voice profile's own patterns: the maintainer's typed
-baseline is ~0 per 1k words, already encoded in the corpus curation (em-dash
+usage follows the voice profile's own patterns: typed text carries almost
+none, already encoded in the corpus curation (em-dash
 carriers are excluded as AI markers) and scored by `emdash_per_1k` in the
 fidelity pass. A deterministic substitution was solving the wrong case — it
 reshaped drafts toward a join style the voice itself barely uses. Supersedes
@@ -254,11 +253,9 @@ model-ism, so no seed word belongs in the shipped source: the personal
 overlay (`profiles/rules.json`, overriding the `banned-words` id) carries
 the register-independent list, and `profiles/<register>/banned.json` extends
 it per register — both machine-local and gitignored, like every other
-profile artifact. The nightly batch of 2026-08-29 had seeded the built-in
-list with the maintainer's own first banned word; it was moved out before
-the batch merged.
+profile artifact.
 
-**Why:** the engine is public; a maintainer's personal vocabulary ruling in
+**Why:** the engine is public; a personal vocabulary choice in
 its source is the same category error as committing the corpus. The
 mechanism is the product, the word is data.
 
@@ -319,8 +316,7 @@ seam: run `local/hooks/pre-push` when it exists, otherwise do nothing.
 **Why:** the tracked hooks are a requirement on every contributor's push, and
 every tracked file is read by strangers; a contributor without the
 maintainer's setup was blocked, and the repository advertised that setup.
-Maintainer ruling of 2026-09-11, reverting a same-day commit that had done
-both.
+Decided 2026-09-11, reverting a same-day commit that had done both.
 
 **Consequences:** `local/` is the home for anything that observes this
 checkout only; nothing tracked names what runs there. The published package
