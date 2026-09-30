@@ -1,5 +1,11 @@
 # hyphos
 
+## 0.5.1
+
+### Patch Changes
+
+- 8e482d3: Update adm-zip to 0.6.1 and mailparser to 3.9.32 (nodemailer 10.0.13), clearing their open security advisories.
+
 ## 0.5.0
 
 ### Minor Changes
