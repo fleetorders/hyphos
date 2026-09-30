@@ -26,13 +26,13 @@
  *   2. It UN-FLOWS `format=flowed` text/plain (RFC 3676), joining soft-wrapped
  *      lines; Python's `get_content()` returns the raw text, so line structure —
  *      and therefore the `"\n-- \n"` signature split and per-paragraph language
- *      split — diverges (≈16% of this corpus is flowed).
+ *      split — diverges (flowed mail is common).
  *   3. It normalizes CRLF→LF; Python preserves the original line endings, which
  *      the signature-delimiter split is sensitive to.
  * So MIME structure, part selection and transfer decoding implement
  * get_body + get_content directly, and charset decoding uses `iconv-lite`
  * — mailparser's own charset engine, which matches Python's codecs byte-for-byte
- * on this corpus (utf-8, us-ascii, iso-8859-1/7/15, windows-1251/1252/1253). No
+ * on the charsets seen in real mail (utf-8, us-ascii, iso-8859-1/7/15, windows-1251/1252/1253). No
  * async remains, so this entry point runs and returns synchronously.
  */
 import fs from "node:fs";
