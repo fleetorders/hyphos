@@ -1,12 +1,13 @@
 #!/usr/bin/env sh
-
-# Screen what this push publishes: branch and tag names, tag and commit messages, and the
-# tracked hooks, scripts and package manifest. The checker is resolved by name from PATH;
-# where it is not installed there is no check, never a failure. (published-surface stub)
-GUARD=$(command -v public-surface-guard || true)
-if [ -x "$GUARD" ]; then
-  "$GUARD" --pre-push "$@" || exit 1
+# Machine-local companion checks, when this machine has any: local/hooks/pre-push at the main
+# checkout's root, gitignored and never tracked. It runs first, with this hook's arguments and
+# stdin; a contributor without one proceeds exactly as before. (published-surface stub)
+COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || COMMON_DIR=""
+COMPANION="${COMMON_DIR%/.git}/local/hooks/pre-push"
+if [ -n "$COMMON_DIR" ] && [ -x "$COMPANION" ]; then
+  "$COMPANION" "$@" || exit 1
 fi
+
 
 # Repo-owned pre-push checks (etymd never touches this file). The generated hook already runs
 # `npm run typecheck`; this adds the test suite, which is where every gate proves it fires.
@@ -22,10 +23,3 @@ fi
 echo "› npm test (git environment scrubbed)"
 # shellcheck disable=SC2046  # the split is the point: each name becomes its own `-u NAME` argument
 env $(env | grep -o '^GIT_[A-Za-z0-9_]*' | sed 's/^/-u /') npm test || exit 1
-
-# A machine-local companion, when this checkout has one. `local/` is gitignored, so whatever runs
-# there is this machine's concern alone and never a requirement on anyone else's push.
-LOCAL_HOOK="$(dirname "$0")/../local/hooks/pre-push"
-if [ -x "$LOCAL_HOOK" ]; then
-  "$LOCAL_HOOK" "$@" || exit 1
-fi

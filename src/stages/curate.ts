@@ -146,14 +146,12 @@ export function runCurate(argv: string[]): number {
     // and JS object semantics); `raw_words` is appended last.
     const rec = { ...o, text: stripped, words: wordCount, raw_words: o.words };
     // Deliberate: a message carrying an
-    // em-dash is excluded from the voice corpus entirely. The owner's typed
-    // baseline measures ~0 of them per 1k words (see profiles/model-isms.md),
-    // so a message that contains one is pasted or AI-influenced text riding in
-    // a user turn — under the length ceiling it would otherwise pass straight
-    // into the fingerprints. Measured before this guard existed: 121 of 3065
-    // curated messages carried them, concentrated in one register bucket at
-    // 20% of its rows and ~44% of its words. These rows go to their own file,
-    // never to quarantine, so the salvage pass cannot recycle them.
+    // em-dash is excluded from the voice corpus entirely. Typed text carries
+    // almost none of them, so a message that contains one is pasted or
+    // AI-influenced text riding in a user turn — under the length ceiling it
+    // would otherwise pass straight into the fingerprints. These rows go to
+    // their own file, never to quarantine, so the salvage pass cannot recycle
+    // them.
     if (stripped.includes("—")) {
       aiMarkedLines.push(
         JSON.stringify({ ...rec, excluded: "ai-marker-emdash" }) + "\n",
