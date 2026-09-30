@@ -263,19 +263,16 @@ mechanism is the product, the word is data.
 
 **Scope:** repo · **Decided:** 2026-08-29
 
-No `public-comment` register is built. Replies the maintainer posts on
-syndicated threads (dev.to and the like) keep the standing practice: drafted
-by imitation of his live replies, not rewritten through the engine and not
-scored. The `informal` register was tried and rejected for this text shape —
-its chat fingerprint lowercases sentence starts, which the live replies never
-do — and none of the existing registers fits. The cited replies are not in
-the corpus, so the bucket could not be fingerprinted from in-repo data; the
-question was put to the maintainer and dropped rather than deferred.
+No `public-comment` register is built. Replies on syndicated comment threads
+(dev.to and the like) are a text shape of their own: the `informal` register
+was tried and rejected for it — its chat fingerprint lowercases sentence
+starts, which such replies do not — and none of the existing registers fits.
+With no tagged sample of these replies in the corpus, the bucket cannot be
+fingerprinted from data, so the register was dropped rather than deferred.
 
 **Why:** a register needs a tagged corpus slice plus a model-distilled
 styleguide; without the raw thread exports there is nothing to build from,
 and a fingerprint-only profile would give a score with no rewrite guidance.
-The practice already in place is the codified answer.
 
 ### D-016 — The em-dash is a banned token: flagged everywhere, replaced per instance by the rewriter
 

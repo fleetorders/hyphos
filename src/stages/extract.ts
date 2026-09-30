@@ -4,8 +4,8 @@
  * Reads a transcript root and keeps only human-typed text: entries of type
  * "user" that are not sidechains, text blocks only. Machine text is dropped —
  * tool results, command wrappers, caveats, system reminders, paste placeholders
- * (pasted text is not your writing), bare slash commands, and the bare "+"
- * continue marker. Exact duplicates are counted once.
+ * (pasted text is not your writing), bare slash commands, and a lone "+"
+ * (a one-character "continue" reply). Exact duplicates are counted once.
  *
  * The transcript root defaults to `<config dir>/projects`, where the config dir
  * is the CLAUDE_CONFIG_DIR environment variable if set, otherwise `~/.claude`.
@@ -177,7 +177,7 @@ function* textBlocks(content: unknown): Generator<string> {
 /**
  * Decide whether a raw block of text is human voice worth keeping, returning the
  * cleaned text or null to drop it. Paste placeholders are stripped and the result
- * trimmed; then empties, the bare "+" continue marker, slash commands, caveats,
+ * trimmed; then empties, a lone "+" reply, slash commands, caveats,
  * interruption notices, and angle-bracket command wrappers / system reminders
  * are all dropped.
  */
