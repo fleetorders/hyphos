@@ -80,7 +80,8 @@ function styleGuide(register: string): string {
   if (g === null) {
     throw new SysExit(
       `register "${register}" has no styleguide.md, so a rewrite would not be ` +
-        `in your voice. Registers without one can be scored but not rewritten. ` +
+        `in your voice. Registers without one can be scored but not rewritten; ` +
+        `write one from docs/styleguide-template.md in the hyphos repository. ` +
         `(profiles dir: ${profilesDir()})`,
     );
   }
