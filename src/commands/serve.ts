@@ -11,14 +11,14 @@
  * `recordFeedback` appends a verdict to `corpus/feedback.jsonl` and returns
  * aggregate counts plus a suggestion once enough negative evidence accumulates.
  *
- * Static files are served from `$HYPHOS_WEB` or `./web` under the current
- * working directory (unlike corpus/profiles, which resolve from the package
- * root via ../lib/paths).
+ * Static files are served from `$HYPHOS_WEB`, else `./web` under the current
+ * working directory when it exists (a checkout being edited), else the `web/`
+ * the package ships.
  */
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import { corpusDir } from "../lib/paths.js";
+import { corpusDir, packageRoot } from "../lib/paths.js";
 import { pyDumps } from "./pyjson.js";
 import { SysExit } from "./sysexit.js";
 import {
@@ -43,7 +43,11 @@ const TYPES: Record<string, string> = {
 type Verdict = "good" | "fine" | "bad";
 
 function webDir(): string {
-  return process.env.HYPHOS_WEB ?? path.join(process.cwd(), "web");
+  if (process.env.HYPHOS_WEB) return process.env.HYPHOS_WEB;
+  const local = path.join(process.cwd(), "web");
+  if (fs.existsSync(path.join(local, "index.html"))) return local;
+  const root = packageRoot();
+  return root === null ? local : path.join(root, "web");
 }
 
 export interface FeedbackResult {

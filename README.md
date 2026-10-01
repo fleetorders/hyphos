@@ -30,7 +30,8 @@ the [roadmap](#roadmap).
 - **Voice profiles, per register** — you don't have one voice; you have modes
   (technical, informal, editorial). hyphos profiles each: a stylometric
   fingerprint (sentence lengths, punctuation habits, openers, rhythm) plus a
-  distilled style guide with your quirks and anti-patterns.
+  style guide with your quirks and anti-patterns, which you write from
+  [the template](https://github.com/fleetorders/hyphos/blob/main/docs/styleguide-template.md).
 - **Rewrite** — feed it any AI-generated draft and a target register; it rewrites
   the draft in your voice.
 - **Hard quirk enforcement** — mechanical habits (punctuation policy, banned
@@ -48,6 +49,11 @@ npx hyphos extract            # extract your own messages from local transcripts
 npx hyphos fingerprint        # compute stylometric fingerprints per register
 npx hyphos rules --test       # self-test the deterministic enforcement rules
 ```
+
+Before `rewrite` works for a register, write its style guide by hand: copy
+[docs/styleguide-template.md](https://github.com/fleetorders/hyphos/blob/main/docs/styleguide-template.md) to
+`profiles/<register>/styleguide.md` and fill it in. A register without one can
+be scored but not rewritten.
 
 Corpus output lands in `corpus/` and profiles in `profiles/` under the
 package root (resolved from the CLI's own location, so commands work from any
@@ -90,6 +96,7 @@ The design record is [docs/decisions.md](docs/decisions.md).
 
 - Score calibration: tie the fidelity number to blind-test verdicts.
 - Email ingest: remove the remaining quoted-reply fragments.
+- A command that drafts a register's style guide from your corpus, for you to edit.
 - More output registers and per-audience presets.
 - Era-weighted profiles, with text written before AI assistants as the anchor.
 

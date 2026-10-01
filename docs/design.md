@@ -15,9 +15,9 @@ profiles/<register>/             — artifacts per register
         │   fingerprint.json     — computed stylometry: sentence-length
         │                          distribution, punctuation habits, casing,
         │                          openers/connectors, paragraph rhythm
-        │   styleguide.md        — model-distilled guide: recurring structures,
-        │                          quirks, anti-patterns; every claim cites
-        │                          sample lines from the corpus
+        │   styleguide.md        — hand-written guide: recurring structures,
+        │                          quirks, anti-patterns, citing sample lines
+        │                          (start from docs/styleguide-template.md)
         │   banned.json          — optional: words this register never uses,
         │                          flagged by the deterministic pass
         ▼
