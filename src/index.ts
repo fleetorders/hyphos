@@ -6,7 +6,7 @@
  * (enforce/rules) that other tools most often want to embed directly.
  */
 
-// Deterministic enforcement engine (D-003) and the rules data.
+// Deterministic enforcement engine (docs/decisions.md, D-003) and the rules data.
 export {
   enforce,
   loadRules,
@@ -39,7 +39,7 @@ export type {
   InferResult,
 } from "./commands/score.js";
 
-// Model-driven rewrite and the LLM judge (D-005 backends).
+// Model-driven rewrite and the LLM judge (docs/decisions.md, D-005 backends).
 export {
   rewrite,
   judge,

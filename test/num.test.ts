@@ -19,7 +19,7 @@ describe("pyRound (round half to even)", () => {
   });
 });
 
-describe("median (statistics.median semantics)", () => {
+describe("median", () => {
   it("odd length returns the middle element", () => {
     expect(median([1, 2, 3])).toBe(2);
     expect(median([3, 1, 2])).toBe(2);

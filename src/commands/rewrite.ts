@@ -1,5 +1,6 @@
 /**
- * Model-driven rewrite and the LLM judge, plus the two model backends (D-005).
+ * Model-driven rewrite and the LLM judge, plus the two model backends
+ * (docs/decisions.md, D-005).
  *
  * `rewrite` builds a style-guided prompt, calls the model, then runs the
  * deterministic enforcement pass over the result. `judge` asks the model to
@@ -141,8 +142,8 @@ export function callClaudeCli(prompt: string): string {
   //
   // `claude -p` is an agent, not a completion endpoint: started in a project
   // directory it loads that project's instructions and the user's settings,
-  // and it can act. Asked to rewrite a paragraph it has been observed doing
-  // unrelated work on the machine and narrating it in place of the rewrite.
+  // and it can act. Asked to rewrite a paragraph it may do unrelated work on
+  // the machine and narrate that in place of the rewrite.
   // `--restricted` drops the command-running tools and the user, project and
   // local settings files; `--permission-prompts none` denies anything that
   // would otherwise prompt; and an empty working directory means no project
@@ -252,14 +253,14 @@ export async function judge(
   ].join("\n");
 
   const order = backend === "auto" ? ["claude", "api"] : [backend];
-  // Report every backend's own failure, never only the last: a claude-CLI
-  // timeout hidden behind an api-key error once cost a whole diagnosis.
+  // Report every backend's own failure, never only the last: a timeout hidden
+  // behind an api-key error would send the whole diagnosis the wrong way.
   const failures: string[] = [];
   for (const b of order) {
     try {
       const raw =
         b === "claude" ? callClaudeCli(prompt) : await callApi(prompt);
-      const m = raw.match(/\{[\s\S]*\}/); // first "{" to last "}" (re.S greedy)
+      const m = raw.match(/\{[\s\S]*\}/); // first "{" to last "}", spanning newlines
       if (!m) throw new Error(`no JSON in judge output: ${raw.slice(0, 120)}`);
       const out = pyJsonParse(m[0]) as Record<string, unknown>;
       out["backend"] = b;
@@ -271,7 +272,7 @@ export async function judge(
   return { error: `judge failed — ${failures.join("; ")}` };
 }
 
-// --- typo injection (D-006, opt-in) ---
+// --- typo injection (docs/decisions.md, D-006; opt-in) ---
 
 // Deterministic 32-bit FNV-1a string hash, used only to seed the shuffle.
 function strHash(s: string): number {
@@ -330,7 +331,7 @@ export function injectTypos(text: string, register: string): [string, number] {
 
   const byCorrect: Record<string, string> = {};
   for (const [typo, correct] of Object.entries(catalog)) {
-    if (!(correct in byCorrect)) byCorrect[correct] = typo; // setdefault: first wins
+    if (!(correct in byCorrect)) byCorrect[correct] = typo; // first typo for a correction wins
   }
 
   const wordCount = (text.toLowerCase().match(/[a-z']+/g) ?? []).length;
@@ -358,7 +359,7 @@ export function injectTypos(text: string, register: string): [string, number] {
 /**
  * Rewrite a draft via the model then the deterministic pass. Tries backends in
  * order and returns [finalText, report, backendUsed]. Throws {@link SysExit} if
- * no backend succeeds (a `SysExit` is raised).
+ * no backend succeeds.
  */
 export async function rewrite(
   register: string,

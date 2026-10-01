@@ -14,9 +14,8 @@
  * a register tag. Stdout is aggregate-only (counts and word totals — never any
  * corpus text), preserving the privacy invariant.
  *
- * The register scorer (`scores`) is inlined verbatim from the register-tagging
- * stage's scorer; an import would keep a single source of truth and can replace
- * this copy if the duplication ever drifts.
+ * The register scorer (`scores`) is imported from the register-tagging stage,
+ * so fragments are scored exactly as whole messages are.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -26,11 +25,10 @@ import { scores, type RegisterScores } from "./tag.js";
 
 // --- salvage-side heuristics -------------------------------------------------
 
-// Word character for boundary tests. Python's `\b` (and `\w`) on a `str` are
-// Unicode-aware — letters, numbers, underscore — while JS `\b`/`\w` are ASCII
-// only. We reconstruct Python's boundary with Unicode-property lookarounds so a
-// keyword butting directly against a non-Latin letter behaves the same as in the
-// reference. `\p{L}\p{N}_` is exactly Python's `\w` (str.isalnum() + underscore).
+// Word character for boundary tests: letters, numbers, underscore. JS `\b`
+// and `\w` are ASCII-only, so the word boundary is expressed as Unicode-
+// property lookarounds — a keyword butting directly against a non-Latin
+// letter must not match.
 const WORD_CHAR = "[\\p{L}\\p{N}_]";
 
 // Instruction-flavored phrasing (the salvage set — broader than the scorer's).
@@ -43,14 +41,14 @@ const SALVAGE_INSTRUCTION_RE = new RegExp(
   "iu",
 );
 
-// Openings that read as correspondence, not a typed instruction. Anchored at the
-// start (Python `re.match`), case-insensitive.
+// Openings that read as correspondence, not a typed instruction. Anchored at
+// the start, case-insensitive.
 const CORRESPONDENCE_RE =
   /^(?:dear |hi |hello |greetings|kind regards|best regards|thanks,|regards,)/i;
 
 // Openings that read as document structure (markdown heading, list item, table
-// row, quote). `\p{Nd}` matches Python `\d` (Unicode decimal digits);
-// case-sensitive. Anchored at the start.
+// row, quote). `\p{Nd}` matches Unicode decimal digits; case-sensitive.
+// Anchored at the start.
 const DOCLIKE_RE = /^(?:#{1,6} |\p{Nd}+\.\s|\* |- |\||>)/u;
 
 /**
@@ -60,7 +58,7 @@ const DOCLIKE_RE = /^(?:#{1,6} |\p{Nd}+\.\s|\* |- |\||>)/u;
  * paragraph, but the instruction search runs over the paragraph as given.
  */
 function typedFlavored(par: string, maxWords: number): boolean {
-  const w = whitespaceSplit(par); // Python str.split() (no arg)
+  const w = whitespaceSplit(par); // splits on whitespace runs
   if (!(w.length >= 4 && w.length <= maxWords)) return false;
   const stripped = par.trim();
   if (CORRESPONDENCE_RE.test(stripped) || DOCLIKE_RE.test(stripped))
@@ -104,10 +102,11 @@ function salvage(text: string): string | null {
 
 /**
  * Reduce a score set to the output register string. Argmax over the rounded
- * scores in insertion order (technical, informal, editorial) so ties resolve to
- * the earlier key — matching Python `max(dict, key=dict.get)`. If the top score
- * is not positive, default to technical (the corpus's nature). "technical" is
- * then emitted as "technical-instruction".
+ * scores in fixed order (technical, informal, editorial) so ties resolve to
+ * the earlier key. If the top score is not positive, default to technical
+ * (the corpus's nature). "technical" is then emitted as
+ * "technical-instruction". This mirrors the argmax the tagging stage runs
+ * inline over the same three fields — keep the two in step.
  */
 function registerFor(s: RegisterScores): string {
   let bestKey = "technical";
@@ -195,9 +194,8 @@ export function runSalvage(argv: string[]): number {
 
   fs.writeFileSync(outPath, lines.map((l) => l + "\n").join(""));
 
-  // Aggregate-only stdout: the quarantine count is printed live — the em-dash
-  // guard upstream changes its size on every curate run, so a hardcoded literal
-  // would drift (fixed together with the guard itself).
+  // Aggregate-only stdout: the quarantine count is printed live, because the
+  // em-dash guard upstream changes the quarantine's size on every curate run.
   process.stdout.write(
     `salvaged: ${kept} fragments, ${keptWords} words (from ${qCount}-message quarantine)\n`,
   );

@@ -1,7 +1,8 @@
 # Research: the AI tell that lives above the sentence
 
-Status: research note with a dry run. No shipped feature; nothing here
-changes `rewrite`, `score`, or `rules.ts`.
+Status: research note with a dry run. The labeling loop it proposes ships as
+`hyphos blind --unit`; the structural scorer does not exist yet, and nothing
+here changes `rewrite`, `score` or `rules.ts`.
 
 ## The problem
 
@@ -88,7 +89,7 @@ differently (see dry run):
    signatures. Degenerate when one class dominates the pool — with coarse
    classes nearly every corpus batch is "uniform", and the metric inverts.
 2. _Presence form_: fraction of texts in the batch that contain at least
-   one `V` and one `M` (the skeleton's load-bearing moves). Measures
+   one `V` and one `M` (the moves the skeleton depends on). Measures
    "every reply in this run carries the same skeleton", which is what
    four-in-a-row actually showed.
 
@@ -142,7 +143,7 @@ Three reasons this is not yet a finding to build on:
    follow-up.
 2. **n = 4, one register, genre-adjacent pool.** A comment-thread corpus
    would be the matched comparison.
-3. **The nulls are load-bearing.** Antithesis, tricolon, concession-pivot
+3. **The nulls carry the argument.** Antithesis, tricolon, concession-pivot
    and paragraph variance show nothing on this sample; if the eventual
    labeled data also leaves them flat, they should be dropped rather than
    kept as cargo.
@@ -212,7 +213,6 @@ says which moves to vary.
 
 ## Next step
 
-Build the labeling loop (the `blind` extension above) — it is the
-prerequisite for trusting any structural metric, and it produces data even
-if every metric in this note dies. The structural scorer is the entry
-after that.
+The labeling loop (`blind --unit`) is built; it is the prerequisite for
+trusting any structural metric, and it produces data even if every metric in
+this note fails. The structural scorer comes next.

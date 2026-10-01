@@ -47,8 +47,11 @@ describe("data root resolution", () => {
     process.chdir(checkout);
     try {
       const root = dataRoot();
-      if (root === repoRoot && fs.existsSync(path.join(repoRoot, "profiles")))
-        return; // this run's package root IS a stocked checkout — same answer
+      if (root === repoRoot && fs.existsSync(path.join(repoRoot, "profiles"))) {
+        // this run's package root IS a stocked checkout — same answer
+        expect(root).toBe(repoRoot); // dataRoot already resolves there
+        return;
+      }
       // realpath: on macOS the cwd resolves /var → /private/var.
       expect(fs.realpathSync(root)).toBe(fs.realpathSync(checkout));
       expect(fs.realpathSync(profilesDir())).toBe(

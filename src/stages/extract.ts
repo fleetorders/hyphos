@@ -5,7 +5,8 @@
  * "user" that are not sidechains, text blocks only. Machine text is dropped —
  * tool results, command wrappers, caveats, system reminders, paste placeholders
  * (pasted text is not your writing), bare slash commands, and a lone "+"
- * (a one-character "continue" reply). Exact duplicates are counted once.
+ * (a common one-character "continue" nudge to the assistant, not writing).
+ * Exact duplicates are counted once.
  *
  * The transcript root defaults to `<config dir>/projects`, where the config dir
  * is the CLAUDE_CONFIG_DIR environment variable if set, otherwise `~/.claude`.
@@ -27,15 +28,15 @@ import { whitespaceSplit } from "../lib/text.js";
 import { corpusDir } from "../lib/paths.js";
 
 // Claude Code's placeholder for elided pasted text, e.g. "[Pasted text #3 +42 lines]".
-// Global flag so every occurrence in a message is removed (mirrors re.sub).
+// Global flag so every occurrence in a message is removed.
 const PASTE_RE = /\[Pasted text #\d+ \+\d+ lines\]/g;
 
 /**
- * Reproduce `pathlib.Path.expanduser`: a leading "~" (alone, or immediately
- * before a path separator) expands to the current user's home directory.
- * Anything else is returned unchanged — including a "~otheruser" form, which is
- * not resolved here (it does not arise for the config dir or the CLI argument in
- * practice) and a path with no leading tilde.
+ * Expand a leading "~" (alone, or immediately before a path separator) to the
+ * current user's home directory. Anything else is returned unchanged —
+ * including a "~otheruser" form, which is not resolved here (it does not arise
+ * for the config dir or the CLI argument in practice) and a path with no
+ * leading tilde.
  */
 function expanduser(p: string): string {
   if (p === "~") return os.homedir();
@@ -51,10 +52,9 @@ function expanduser(p: string): string {
  *   - else the base is CLAUDE_CONFIG_DIR (when set) or `<home>/.claude`, and the
  *     root is `<base>/projects`.
  *
- * `argv` follows the `sys.argv` convention: element 0 is the program/command
- * name and element 1 is the optional transcript directory, so `argv.length > 1`
- * selects it. An empty CLAUDE_CONFIG_DIR is treated as unset (matching a falsy
- * environment lookup).
+ * Element 0 of `argv` is the program name and element 1 is the optional
+ * transcript directory, so `argv.length > 1` selects it. An empty
+ * CLAUDE_CONFIG_DIR is treated as unset (matching a falsy environment lookup).
  */
 function transcriptRoot(argv: string[]): string {
   if (argv.length > 1) return expanduser(argv[1]!);
@@ -88,16 +88,15 @@ function isDir(p: string): boolean {
   }
 }
 
-/** Code-unit string comparison (Python `sorted()` semantics) over ASCII names. */
+/** Code-unit string comparison over ASCII names (a stable alphabetical order). */
 function byName(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**
- * Equivalent of `Path.glob("*.jsonl")`: every entry whose name ends in ".jsonl"
- * — files, directories, and dotfiles alike — sorted by name. A directory that
- * matches is returned too; it later fails to open and is skipped
- * (open-and-skip behavior).
+ * Every entry whose name ends in ".jsonl" — files, directories, and dotfiles
+ * alike — sorted by name. A directory that matches is returned too; it later
+ * fails to open and is skipped.
  */
 function globJsonl(dir: string): string[] {
   let names: string[];
@@ -114,9 +113,10 @@ function globJsonl(dir: string): string[] {
 
 /**
  * Yield [projectDir, sessionFile] pairs. Top-level project directories are
- * scanned directly; the special ".archive" directory is descended one extra
- * level (its sub-directories are treated as project directories). Non-directory
- * entries at the top level are skipped.
+ * scanned directly; the ".archive" directory, where the transcript tool files
+ * older projects one level down, is descended one extra level (its
+ * sub-directories are treated as project directories). Non-directory entries
+ * at the top level are skipped.
  */
 function* iterSessionFiles(root: string): Generator<[string, string]> {
   if (!isDir(root)) return;
@@ -150,9 +150,9 @@ function* iterSessionFiles(root: string): Generator<[string, string]> {
 /**
  * Yield the text of each usable content block. `content` is either a bare string
  * (yielded as-is) or a list of blocks, of which only `{ "type": "text" }` blocks
- * contribute their `text`. A missing `text` field yields "" (the
- * `block.get("text", "")` default). A present-but-non-string `text` is
- * treated as empty — this does not occur in real transcripts.
+ * contribute their `text`. A missing `text` field yields "". A
+ * present-but-non-string `text` is treated as empty — this does not occur in
+ * real transcripts.
  */
 function* textBlocks(content: unknown): Generator<string> {
   if (typeof content === "string") {
@@ -198,19 +198,17 @@ function asRecord(v: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/** The file name with its final extension removed — matches `pathlib.Path.stem`. */
+/** The file name with its final extension removed. */
 function stem(file: string): string {
   return path.basename(file, path.extname(file));
 }
 
 /**
- * Serialize a flat object exactly like `json.dumps(obj, ensure_ascii=False)` with
- * its default separators — ", " between items and ": " between key and value
- * (the default when no indent is given). JSON.stringify handles value escaping
- * (control characters, quotes) and leaves non-ASCII literal, matching
- * ensure_ascii=False; the manual separators reproduce that spacing so
- * the JSONL is byte-for-byte identical. Values must be JSON scalars, which every
- * record field is.
+ * Serialize a flat object in the corpus JSONL line format: a space after every
+ * comma and colon. JSON.stringify handles value escaping (control characters,
+ * quotes) and leaves non-ASCII literal; the manual separators add the spacing
+ * JSON.stringify omits, keeping the line format fixed. Values must be JSON
+ * scalars, which every record field is.
  */
 function dumpsFlat(obj: Record<string, unknown>): string {
   const parts = Object.entries(obj).map(
@@ -246,15 +244,14 @@ export function runExtract(argv: string[]): number {
     let content: string;
     try {
       // Node's utf8 decoder replaces malformed byte sequences with U+FFFD and
-      // never throws (the errors="replace" behavior). Reading a
-      // directory (a matched *.jsonl dir) throws EISDIR here and is skipped,
-      // matching the open-raises-OSError path.
+      // never throws. Reading a directory (a matched *.jsonl dir) throws
+      // EISDIR here and is skipped.
       content = fs.readFileSync(f, "utf8");
     } catch {
       continue;
     }
     const sessionStem = stem(f);
-    // Universal-newline split (\r\n, \r, or \n), matching text-mode iteration.
+    // Universal-newline split (\r\n, \r, or \n).
     for (const line of content.split(/\r\n|\r|\n/)) {
       let parsed: unknown;
       try {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { detectLang, splitByLang } from "../src/lib/lang.js";
 
-// Verbatim self-test cases for the language tagger.
+// Self-test cases for the language tagger.
 describe("detectLang", () => {
   const cases: [string, string][] = [
     ["kalimera, tha se paro tilefono meta, eimai edo kai perimeno", "gr-latn"],

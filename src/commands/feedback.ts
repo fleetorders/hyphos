@@ -1,10 +1,10 @@
 /**
  * The feedback store: `corpus/feedback.jsonl`, one append-only JSON-lines log
- * shared by every judge of the tool's output. `serve record_feedback` appends
- * good/fine/bad verdicts; the blind labeling loop appends `kind: "blind-arg"`
- * records. One module owns the file's location and write convention
- * (pyDumps with ensure_ascii=False) so the two record shapes can never drift
- * apart at the storage layer.
+ * shared by every judge of the tool's output. The web app's `recordFeedback`
+ * appends good/fine/bad verdicts; the blind labeling loop appends `kind:
+ * "blind-arg"` records. One module owns the file's location and write
+ * convention (pyDumps with literal non-ASCII) so the two record shapes can
+ * never drift apart at the storage layer.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -15,7 +15,7 @@ export function feedbackPath(): string {
   return path.join(corpusDir(), "feedback.jsonl");
 }
 
-// Python datetime.now().isoformat(timespec="seconds"): local time, no timezone.
+// ISO-8601 to second precision: local time, no timezone.
 export function isoSeconds(d: Date): string {
   const p = (x: number): string => String(x).padStart(2, "0");
   return (

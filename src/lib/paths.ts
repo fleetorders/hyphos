@@ -61,8 +61,8 @@ function checkoutFrom(start: string): string | null {
 /**
  * The package root — walk up from this module to the nearest `package.json`
  * named `hyphos`, whether running from `src/` (tsx, tests) or from the
- * bundled `dist/` CLI. Falls back to the cwd (the historical behavior) only
- * if the walk leaves the package entirely, e.g. an exotic embedding.
+ * bundled `dist/` CLI. Falls back to the cwd only if the walk leaves the
+ * package entirely, e.g. an exotic embedding.
  */
 export function dataRoot(): string {
   if (process.env.HYPHOS_HOME) return process.env.HYPHOS_HOME;

@@ -1,13 +1,14 @@
 /**
  * The local web app and the feedback log.
  *
- * `serve` runs the Translate-style UI on localhost only (D-001: the data plane
- * never leaves the machine; the server binds 127.0.0.1). It exposes JSON
- * endpoints — registers, infer, feedback, rewrite, enforce, score — with fixed
- * routing, error mapping (a `SysExit` becomes an HTTP 502), and compact
- * `ensure_ascii=False` JSON responses.
+ * `serve` runs the Translate-style UI on localhost only (docs/decisions.md,
+ * D-001 — the data plane never leaves the machine; the server binds
+ * 127.0.0.1). It exposes JSON endpoints — registers, infer, feedback,
+ * rewrite, enforce, score — with fixed routing, error mapping (a `SysExit`
+ * becomes an HTTP 502), and compact JSON responses that keep non-ASCII
+ * literal.
  *
- * `record_feedback` appends a verdict to `corpus/feedback.jsonl` and returns
+ * `recordFeedback` appends a verdict to `corpus/feedback.jsonl` and returns
  * aggregate counts plus a suggestion once enough negative evidence accumulates.
  *
  * Static files are served from `$HYPHOS_WEB` or `./web` under the current
@@ -144,7 +145,7 @@ async function handlePost(
     ) as Record<string, unknown>;
     const text = (body.text as string | undefined) ?? "";
     const register0 = (body.register as string | undefined) ?? "editorial";
-    const route = req.url ?? ""; // matches Python self.path (query included)
+    const route = req.url ?? ""; // the query string, when present, is part of the route
 
     if (route === "/api/registers") {
       sendJson(res, 200, { registers: registersInfo() });
