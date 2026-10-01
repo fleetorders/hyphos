@@ -4,7 +4,7 @@
   "description": "Rewrite any AI draft so it reads as written by you — register-aware voice profiles built from your own writing, with deterministic quirk enforcement and a fidelity score.",
   "type": "module",
   "bin": {
-    "hyphos": "./dist/cli.js"
+    "hyphos": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "files": [
