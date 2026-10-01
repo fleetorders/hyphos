@@ -1,5 +1,12 @@
 # hyphos
 
+## 0.5.2
+
+### Patch Changes
+
+- 817755c: Public repository shape: the design record moves to docs/decisions.md, the roadmap lives in the README, the web footer and manifest say the tool runs locally, and the rhythm-only fingerprint signal no longer names an internal decision number.
+- dcd8c2e: `serve` works from an installed package: the web app now ships with it and is used when the working directory has no `web/`. The style guide `rewrite` needs is documented as hand-written, with a template in docs/styleguide-template.md.
+
 ## 0.5.1
 
 ### Patch Changes
