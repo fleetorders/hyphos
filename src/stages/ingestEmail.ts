@@ -45,9 +45,11 @@ import { whitespaceSplit } from "../lib/text.js";
 import { Counter } from "../lib/counter.js";
 import { corpusDir } from "../lib/paths.js";
 
-// iconv-lite is a dependency of mailparser (already installed) and is the charset
-// decoder mailparser itself uses; it reproduces Python's `bytes.decode(charset,
-// errors="replace")` (including the U+FFFD replacements) for every charset here.
+// iconv-lite is declared as a direct dependency: relying on mailparser's own copy
+// broke production installs, where the tree carries it only nested or dev-marked,
+// off this module's require path. It is the charset decoder mailparser itself uses
+// and reproduces Python's `bytes.decode(charset, errors="replace")` (including the
+// U+FFFD replacements) for every charset here.
 const iconv = createRequire(import.meta.url)("iconv-lite") as {
   decode(
     buf: Buffer,

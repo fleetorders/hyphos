@@ -20,3 +20,7 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+      # The published artifact must start under a production-only install —
+      # catches dist/ requiring a package the tree only carries as a dev-marked
+      # or nested transitive (the iconv-lite outage).
+      - run: npm run pack:smoke
