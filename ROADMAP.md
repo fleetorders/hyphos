@@ -10,7 +10,7 @@ Living list — items get done, dropped, or reordered.
 - `--typos natural|none` flag on rewrite (default none, D-006).
 - Greeklish handling for chat ingest: Latin-written Greek gets its own
   language tag and stays rhythm-signal only — no transliteration round-trips
-  (two lossy layers). Ready before the Meta export arrives.
+  (two lossy layers).
 
 ## Next
 
