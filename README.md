@@ -16,27 +16,22 @@ register-aware voice profiles from your own writing — chat transcripts, export
 posts — preserves your quirk-level habits with enforcement rules a model can't
 drift away from, and scores every output for how much it actually sounds like you.
 
-This is the Node/TypeScript implementation, distributed on npm and runnable with
-`npx`. The tool began life as a Python pipeline and was ported to TypeScript
-with stage-by-stage output verification at cutover; the porting harness was
-removed once the port was proven.
-
 **Status: working end to end, with named rough edges.** The corpus pipeline —
 extraction, curation, register tagging, chat/email ingest, stylometric
 fingerprints — and the output side both run today: `rewrite` (a model pass
 over your own claude CLI or Anthropic API credentials, then the deterministic
 enforcement pass), `score` (the model-free fidelity v1, plus the model-judged
 half via `score --judge`), `blind` self-tests, and the local web app
-(`serve`). Still open: score calibration, fingerprint refinements (sentence
-splitting, email quote-fragment cleanup, per-register typo rate), and the
-`--typos natural` rewrite mode — see the [roadmap](ROADMAP.md).
+(`serve`). Still open: score calibration and email quote-fragment cleanup; see
+the [roadmap](#roadmap).
 
 ## What it does
 
 - **Voice profiles, per register** — you don't have one voice; you have modes
   (technical, informal, editorial). hyphos profiles each: a stylometric
   fingerprint (sentence lengths, punctuation habits, openers, rhythm) plus a
-  distilled style guide with your quirks and anti-patterns.
+  style guide with your quirks and anti-patterns, which you write from
+  [the template](https://github.com/fleetorders/hyphos/blob/main/docs/styleguide-template.md).
 - **Rewrite** — feed it any AI-generated draft and a target register; it rewrites
   the draft in your voice.
 - **Hard quirk enforcement** — mechanical habits (punctuation policy, banned
@@ -44,7 +39,8 @@ splitting, email quote-fragment cleanup, per-register typo rate), and the
   models normalize personal quirks away and drift from style instructions as
   context grows.
 - **A fidelity score** — every output gets a "how-much-like-you" number
-  (stylometric match plus a judge rubric), calibrated by blind self-tests.
+  (stylometric match plus a judge rubric), checked by blind self-tests; its
+  calibration is still open.
 
 ## Quick start
 
@@ -53,6 +49,11 @@ npx hyphos extract            # extract your own messages from local transcripts
 npx hyphos fingerprint        # compute stylometric fingerprints per register
 npx hyphos rules --test       # self-test the deterministic enforcement rules
 ```
+
+Before `rewrite` works for a register, write its style guide by hand: copy
+[docs/styleguide-template.md](https://github.com/fleetorders/hyphos/blob/main/docs/styleguide-template.md) to
+`profiles/<register>/styleguide.md` and fill it in. A register without one can
+be scored but not rewritten.
 
 Corpus output lands in `corpus/` and profiles in `profiles/` under the
 package root (resolved from the CLI's own location, so commands work from any
@@ -73,9 +74,10 @@ It is never mined for word choice and never transliterated.
 
 ## Privacy by design
 
-Your corpus and profiles never leave your machine: `corpus/` and `profiles/` are
-gitignored, nothing is transmitted anywhere, and model calls (for the rewrite
-stage) use your own credentials.
+Your corpus and profiles stay on your machine: `corpus/` and `profiles/` are
+gitignored and never uploaded. The one thing that leaves it is a rewrite or judge
+call: the draft and the profile's style guidance go to the backend you chose (your
+`claude` CLI or your Anthropic API key), under your own credentials.
 
 ## Development
 
@@ -85,7 +87,18 @@ npm test          # unit tests
 npm run build     # bundle to dist/ (the published CLI)
 ```
 
-Roadmap: [ROADMAP.md](ROADMAP.md) · Decisions: [DECISIONS.md](DECISIONS.md)
+The git hooks under `.githooks/` and the `.etymd/` config come from
+[etymd](https://www.npmjs.com/package/etymd) and do nothing where it is not installed;
+`.githooks/*.local` runs a gitignored `local/` directory for machine-specific checks.
+The design record is [docs/decisions.md](docs/decisions.md).
+
+## Roadmap
+
+- Score calibration: tie the fidelity number to blind-test verdicts.
+- Email ingest: remove the remaining quoted-reply fragments.
+- A command that drafts a register's style guide from your corpus, for you to edit.
+- More output registers and per-audience presets.
+- Era-weighted profiles, with text written before AI assistants as the anchor.
 
 ## License
 

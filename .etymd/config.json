@@ -2,7 +2,7 @@
   "gates": {
     "commitFormat": true,
     "_why": {
-      "commitFormat": "Public from the first commit, so the history starts Conventional and asks for the door that keeps it that way. The check is off by default in the pack — it is an opinion, and a repo has to choose it."
+      "commitFormat": "etymd (the git-hook generator named in the README) checks that commit messages follow Conventional Commits. The check is off by default in etymd, so this repository turns it on."
     }
   }
 }

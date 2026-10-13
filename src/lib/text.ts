@@ -1,30 +1,30 @@
 /**
- * Text primitives shared across stages. Regexes are chosen to match Python's
- * `str`-mode `re` semantics, not JS defaults:
+ * Text primitives shared across stages. The regexes are deliberately not the
+ * JS defaults:
  *
- * - Word tokenization uses `\p{L}\p{N}_` under the `u` flag, because Python's
- *   `\w` on a `str` is Unicode-aware (letters, numbers, underscore) while JS
- *   `\w` is ASCII-only. This matters for Greek/greeklish rhythm counting.
- * - `demojibake` reproduces `s.encode("latin-1").decode("utf-8")` including its
- *   failure modes: Python raises (and the caller falls back to the original) when
- *   a character is outside latin-1 or the bytes are not valid UTF-8.
+ * - Word tokenization uses `\p{L}\p{N}_` under the `u` flag, so a word is
+ *   Unicode-aware (letters, numbers, underscore) rather than ASCII-only. This
+ *   matters for Greek/greeklish rhythm counting.
+ * - `demojibake` reverses a latin-1 mis-decoding of UTF-8 bytes, falling back
+ *   to the original string when a character is outside latin-1 or the bytes
+ *   are not valid UTF-8.
  */
 
 const WORD_RE = /[\p{L}\p{N}_']+/gu;
 const TYPO_RE = /[a-z']{4,14}/g;
 const LATIN_LOWER_RE = /[a-z]+/g;
 
-/** `re.findall(r"[\w']+", t)` — Unicode-aware word tokens. */
+/** Unicode-aware word tokens (letters, numbers, underscore, apostrophe). */
 export function words(t: string): string[] {
   return t.match(WORD_RE) ?? [];
 }
 
-/** `re.findall(r"[a-z']{4,14}", t)` — ASCII typo-candidate tokens. */
+/** ASCII typo-candidate tokens: 4–14 lowercase letters/apostrophes. */
 export function typoTokens(t: string): string[] {
   return t.match(TYPO_RE) ?? [];
 }
 
-/** `re.findall(r"[a-z]+", s.lower())` — ASCII lowercase runs. */
+/** ASCII lowercase runs of the lowercased input. */
 export function latinLowerWords(s: string): string[] {
   return s.toLowerCase().match(LATIN_LOWER_RE) ?? [];
 }
@@ -43,16 +43,16 @@ export function sentencesOf(text: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-// Python `str.split()` whitespace set (Py_UNICODE_ISSPACE): ASCII 0x09–0x0d,
-// 0x1c–0x1f and 0x20, NEL 0x85, plus the Unicode White_Space characters — but
-// NOT the BOM (0xFEFF), which JS `\s` wrongly includes. Matching this set
-// exactly keeps word counts stable.
+// The whitespace set for splitting and trimming: ASCII 0x09–0x0d, 0x1c–0x1f
+// and 0x20, NEL 0x85, plus the Unicode White_Space characters — but NOT the
+// BOM (0xFEFF), which JS `\s` wrongly includes. Keeping this set fixed keeps
+// word counts stable.
 const PY_WS =
   "\\t\\n\\x0b\\f\\r\\x1c\\x1d\\x1e\\x1f \\x85\\xa0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
 const PY_WS_SPLIT = new RegExp(`[${PY_WS}]+`);
 const PY_WS_TRIM = new RegExp(`^[${PY_WS}]+|[${PY_WS}]+$`, "g");
 
-/** Python `str.split()` with no args: split on Python whitespace, drop empties. */
+/** Split on runs of the whitespace set above, dropping empty pieces. */
 export function whitespaceSplit(s: string): string[] {
   const t = s.replace(PY_WS_TRIM, "");
   return t.length === 0 ? [] : t.split(PY_WS_SPLIT);
@@ -60,20 +60,20 @@ export function whitespaceSplit(s: string): string[] {
 
 /**
  * Undo Meta's mojibake: it writes UTF-8 bytes escaped as latin-1, so text
- * arrives double-encoded. Implements `s.encode("latin-1").decode("utf-8")`
- * with fallback-on-error.
+ * arrives double-encoded. Re-reads the code points as bytes and decodes them
+ * as UTF-8, falling back to the original string when that is not possible.
  */
 export function demojibake(s: string): string {
-  // encode("latin-1") raises if any code point exceeds 0xFF — properly-encoded
-  // Greek and emoji land here and are returned unchanged (as in Python).
+  // A code point above 0xFF cannot be a latin-1 byte — properly-encoded Greek
+  // and emoji land here and are returned unchanged.
   const bytes = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) {
     const c = s.charCodeAt(i);
     if (c > 0xff) return s;
     bytes[i] = c;
   }
-  // decode("utf-8") is strict in Python (raises on invalid); Node inserts U+FFFD
-  // and never throws, so treat a replacement char as the decode having failed.
+  // Node's UTF-8 decoder inserts U+FFFD for invalid bytes and never throws;
+  // treat a replacement char as the decode having failed.
   const decoded = Buffer.from(bytes).toString("utf8");
   if (decoded.includes("�")) return s;
   return decoded;

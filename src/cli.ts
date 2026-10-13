@@ -8,7 +8,8 @@
  * stages receive their raw argument list unchanged so each can parse its own
  * options, matching the convention `runX(argv): number`.
  *
- * Backends (D-005): "claude" drives the local claude CLI (your subscription);
+ * Backends (docs/decisions.md, D-005): "claude" drives the local claude CLI
+ * (your subscription);
  * "api" uses ANTHROPIC_API_KEY; "auto" prefers claude.
  */
 import { Command, Option } from "commander";

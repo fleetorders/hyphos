@@ -118,7 +118,7 @@ export function splitByLang(text: string): [Lang, string][] {
     );
   }
 
-  // max(dict, key=dict.get): first-inserted key wins a tie.
+  // First-inserted key wins a tie.
   let majority: Lang = tagged[0]![0];
   let best = -1;
   for (const [lang, n] of wordsByLang) {

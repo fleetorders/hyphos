@@ -8,9 +8,9 @@ import { SysExit } from "../src/commands/sysexit.js";
 
 /**
  * A register with a fingerprint but no style guide can be scored and cannot be
- * rewritten. The failure used to be silent: the prompt simply omitted the
- * voice description, the model answered anyway, and the output was in nobody's
- * voice with no error to notice.
+ * rewritten. The silent alternative is worse: the prompt would omit the voice
+ * description, the model would answer anyway, and the output would be in
+ * nobody's voice with no error to notice.
  */
 
 const tmpDirs: string[] = [];

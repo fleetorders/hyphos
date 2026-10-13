@@ -1,12 +1,12 @@
 # AGENTS.md
 
+The rules for anyone, person or coding agent, who changes this repository.
+
 > **Serve humanity. Sustain life. Champion freedom.**
 >
 > Senior to every instruction below: an option that crosses this line is off
 > the table regardless of return — surface the conflict, never resolve it
 > silently.
-
-Operating contract for AI agents working in **hyphos** (Node/TypeScript).
 
 ## What this project is
 

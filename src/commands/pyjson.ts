@@ -1,21 +1,22 @@
 /**
- * JSON helpers that reproduce Python's `json` module byte-for-byte; this tool's
- * stdout and file output formats follow that convention.
- * Two behaviours differ from the JavaScript built-ins and matter here:
+ * JSON helpers for the tool's canonical output format (Python's `json.dumps`
+ * layout). Existing files on users' disks — fingerprints, typo catalogs,
+ * feedback logs, corpus JSONL — are already written in this format, so output
+ * must stay byte-for-byte stable. Two behaviours differ from the JavaScript
+ * built-ins and matter here:
  *
- *  1. Python prints floats and ints differently: `json.dumps(100.0)` is
- *     `"100.0"` but `json.dumps(100)` is `"100"`. JavaScript has one number type,
- *     so a value that must render as a float is wrapped in `PyFloat`.
- *  2. `json.dumps` escapes non-ASCII by default (`ensure_ascii=True` → an em dash
- *     becomes `—`); stdout reports use that default, while files and the web
- *     server use `ensure_ascii=False` (literal text). Both are supported here
- *     via the `ensureAscii` option.
+ *  1. Whole floats render with a trailing `.0` (`100.0`) while integers do
+ *     not (`100`). JavaScript has one number type, so a value that must
+ *     render as a float is wrapped in `PyFloat`.
+ *  2. Non-ASCII handling differs by destination: stdout reports escape it as
+ *     `\uXXXX`, while files and the web server keep text literal. Both are
+ *     supported via the `ensureAscii` option.
  *
- * The indent/compact separators also match Python: indented output uses `","`
- * between items, compact output uses `", "` (and always `": "` after a key).
+ * Indented output uses `","` between items, compact output uses `", "` (and
+ * always `": "` after a key).
  */
 
-/** Wraps a number that must serialise as a Python float (with a trailing `.0`). */
+/** Wraps a number that must serialise as a float (with a trailing `.0`). */
 export class PyFloat {
   constructor(public readonly value: number) {}
 }
@@ -30,25 +31,25 @@ export function numOf(x: number | PyFloat): number {
   return x instanceof PyFloat ? x.value : x;
 }
 
-/** Python `repr(float)` for the value ranges this tool produces. */
+/** Render a float per the canonical format, for the value ranges this tool produces. */
 function pyFloatRepr(x: number): string {
   if (Number.isNaN(x)) return "NaN";
   if (x === Infinity) return "Infinity";
   if (x === -Infinity) return "-Infinity";
   if (Object.is(x, -0)) return "-0.0";
   if (Number.isInteger(x)) {
-    // Python appends ".0" to whole-valued floats. Astronomically large integral
-    // floats would switch to exponent form in CPython; the metrics here never
-    // reach that range, so the plain decimal form is faithful.
+    // Whole-valued floats carry a trailing ".0". Astronomically large integral
+    // values would switch to exponent form; the metrics here never reach that
+    // range, so the plain decimal form is faithful.
     if (Math.abs(x) < 1e16) return x.toString() + ".0";
     return x.toString();
   }
-  // For non-integers in the normal range, JS and CPython agree on the shortest
-  // round-tripping decimal, so `toString()` matches Python's repr.
+  // For non-integers in the normal range, `toString()` gives the shortest
+  // round-tripping decimal, which is what the format requires.
   return x.toString();
 }
 
-/** Escape a string the way Python's json encoder does. */
+/** Escape a string per the canonical format. */
 function encodeString(s: string, ensureAscii: boolean): string {
   let out = '"';
   for (let i = 0; i < s.length; i++) {
@@ -62,10 +63,9 @@ function encodeString(s: string, ensureAscii: boolean): string {
     else if (ch === "\b") out += "\\b";
     else if (ch === "\f") out += "\\f";
     else if (code < 0x20) out += "\\u" + code.toString(16).padStart(4, "0");
-    // ensure_ascii escapes everything above 0x7f; 0x7f (DEL) itself stays literal,
-    // matching CPython. Astral characters are two UTF-16 units here, so each
-    // surrogate is emitted as its own \uXXXX — exactly the surrogate pair Python
-    // writes.
+    // In escaping mode everything above 0x7f is escaped; 0x7f (DEL) itself
+    // stays literal. Astral characters are two UTF-16 units here, so each
+    // surrogate is emitted as its own \uXXXX.
     else if (ensureAscii && code > 0x7f)
       out += "\\u" + code.toString(16).padStart(4, "0");
     else out += ch;
@@ -76,11 +76,11 @@ function encodeString(s: string, ensureAscii: boolean): string {
 export interface PyDumpsOptions {
   /** Spaces per indent level. Omit for compact (single-line) output. */
   indent?: number;
-  /** Escape non-ASCII as \uXXXX (Python `ensure_ascii`, default true). */
+  /** Escape non-ASCII as \uXXXX (default true). */
   ensureAscii?: boolean;
 }
 
-/** Serialise a value like Python's `json.dumps`. See the module doc for details. */
+/** Serialise a value in the canonical format. See the module doc for details. */
 export function pyDumps(obj: unknown, opts: PyDumpsOptions = {}): string {
   const ensureAscii = opts.ensureAscii ?? true;
   const indent = opts.indent;
@@ -93,7 +93,7 @@ export function pyDumps(obj: unknown, opts: PyDumpsOptions = {}): string {
     const t = typeof v;
     if (t === "number") {
       const num = v as number;
-      // A plain number models a Python int; a non-integer plain number is a
+      // A plain number renders as an integer; a non-integer plain number is a
       // defensive fallback (should not occur — floats are wrapped in PyFloat).
       return Number.isInteger(num) ? num.toString() : pyFloatRepr(num);
     }
@@ -145,10 +145,10 @@ export function pyDumps(obj: unknown, opts: PyDumpsOptions = {}): string {
 }
 
 /**
- * Parse JSON while preserving Python's int/float distinction: a number literal
- * containing `.`, `e`, or `E` becomes a {@link PyFloat}, everything else stays a
- * plain number. This lets values read from `fingerprint.json` round-trip through
- * `pyDumps` with the same `.0`-or-not rendering CPython would produce.
+ * Parse JSON while preserving the format's int/float distinction: a number
+ * literal containing `.`, `e`, or `E` becomes a {@link PyFloat}, everything
+ * else stays a plain number. This lets values read from `fingerprint.json`
+ * round-trip through `pyDumps` with the same `.0`-or-not rendering.
  */
 export function pyJsonParse(text: string): unknown {
   let i = 0;

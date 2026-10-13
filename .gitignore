@@ -12,3 +12,4 @@ dist/
 
 # local-only tooling: never tracked, never published
 local/
+.etymd/baseline.json

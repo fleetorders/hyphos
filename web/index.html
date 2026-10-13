@@ -387,7 +387,7 @@
           </select>
         </label>
         <label
-          title="Measured, characteristic imperfections from your own typo catalog (D-006)"
+          title="Measured, characteristic imperfections from your own typo catalog"
           >Typos
           <select id="ttypos">
             <option value="none">none (default)</option>
@@ -406,8 +406,8 @@
     </details>
 
     <footer>
-      Local only — your text never leaves this machine · <kbd>⌘</kbd
-      ><kbd>⏎</kbd> rewrites
+      Profiles stay on this machine; a rewrite sends the draft to your chosen
+      backend · <kbd>⌘</kbd><kbd>⏎</kbd> rewrites
     </footer>
 
     <script>
@@ -434,7 +434,7 @@
         for (const b of tabs.children)
           b.classList.toggle("on", b.dataset.v === reg);
       }
-      // Registers are discovered, never declared (D-007): the server lists what
+      // Registers are discovered, never declared (docs/decisions.md, D-007): the server lists what
       // the profiles can produce, with sampling-depth confidence.
       addTab("auto", "auto", "infer the register from the draft");
       fetch("/api/registers")

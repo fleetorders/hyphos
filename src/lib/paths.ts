@@ -61,11 +61,27 @@ function checkoutFrom(start: string): string | null {
 /**
  * The package root — walk up from this module to the nearest `package.json`
  * named `hyphos`, whether running from `src/` (tsx, tests) or from the
- * bundled `dist/` CLI. Falls back to the cwd (the historical behavior) only
- * if the walk leaves the package entirely, e.g. an exotic embedding.
+ * bundled `dist/` CLI. Falls back to the cwd only if the walk leaves the
+ * package entirely, e.g. an exotic embedding.
  */
 export function dataRoot(): string {
   if (process.env.HYPHOS_HOME) return process.env.HYPHOS_HOME;
+  const dir = packageRoot();
+  if (dir === null) return process.cwd();
+  // The package root carries no profiles (e.g. an `npx` cache install of the
+  // published package): prefer the cwd's checkout, which has them.
+  if (!isDir(path.join(dir, "profiles"))) {
+    const checkout = checkoutFrom(process.cwd());
+    if (checkout !== null) return checkout;
+  }
+  return dir;
+}
+
+/**
+ * The directory holding hyphos's own `package.json`, found by walking up from
+ * this module, or null when the walk leaves the package entirely.
+ */
+export function packageRoot(): string | null {
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (;;) {
     try {
@@ -77,14 +93,8 @@ export function dataRoot(): string {
       // no readable package.json here — keep walking up
     }
     const parent = path.dirname(dir);
-    if (parent === dir) return process.cwd();
+    if (parent === dir) return null;
     dir = parent;
-  }
-  // The package root carries no profiles (e.g. an `npx` cache install of the
-  // published package): prefer the cwd's checkout, which has them.
-  if (!isDir(path.join(dir, "profiles"))) {
-    const checkout = checkoutFrom(process.cwd());
-    if (checkout !== null) return checkout;
   }
   return dir;
 }

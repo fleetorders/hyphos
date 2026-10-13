@@ -75,9 +75,9 @@ export function makeBlindArgRecord(args: {
 }
 
 /**
- * Normalize a unit for hashing: Python-whitespace collapsed to single
- * spaces, trimmed, lowercased — so a re-fed text differing only in layout or
- * case is still recognized as judged.
+ * Normalize a unit for hashing: whitespace runs collapsed to single spaces,
+ * trimmed, lowercased — so a re-fed text differing only in layout or case is
+ * still recognized as judged.
  */
 export function normalizeUnitText(t: string): string {
   return whitespaceSplit(t).join(" ").toLowerCase();
@@ -163,7 +163,7 @@ function dedupeUnseen(pool: string[], seen: ReadonlySet<string>): string[] {
   return out;
 }
 
-// random.sample(population, k): k distinct elements in random order.
+// Draw k distinct elements in random order.
 function sample<T>(population: T[], k: number): T[] {
   const pool = [...population];
   for (let i = pool.length - 1; i > 0; i--) {

@@ -1,7 +1,7 @@
 {
   "name": "hyphos",
   "short_name": "hyphos",
-  "description": "Rewrite AI drafts in your own voice — local only.",
+  "description": "Rewrite AI drafts in your own voice; your profiles stay on your machine.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7f6f3",

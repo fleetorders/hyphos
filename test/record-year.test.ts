@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { recordYear } from "../src/stages/fingerprint.js";
 
 /**
- * The year buckets were never an email feature — but only the mail ingest wrote
- * a timestamp the year could be read from, so for every other source the split
- * silently did nothing. These cases pin each timestamp shape the corpus
- * actually contains.
+ * A year must be readable from every timestamp shape the sources write, or the
+ * period split (`-pre2023` / `-recent`) never happens for that source. These
+ * cases pin each shape: RFC-5322 mail dates, epoch seconds and milliseconds
+ * from chat exports, ISO-8601 from session transcripts.
  */
 
 describe("the year of a record, whatever its timestamp shape", () => {

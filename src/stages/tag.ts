@@ -1,8 +1,8 @@
 /**
- * Stage 1a — tag each curated message with a register (the mode the person is
+ * Stage 1 — tag each curated message with a register (the mode the person is
  * writing in).
  *
- * v1 buckets:
+ * The register buckets:
  * - technical-instruction — telling an agent/tool what to do: imperatives, task
  *   vocabulary, repo/tool nouns. The bulk of a chat corpus.
  * - informal — casual voice: casual tokens, short bursts.
@@ -151,11 +151,11 @@ const DISCOURSE = new Set([
 // `g` = count every match.
 const INSTRUCTION_RE =
   /(?<![\p{L}\p{N}_])(i want|i need|i would like|can you|could you|let'?s|we (should|want|need)|please|make sure|instead of|proceed|continue)(?![\p{L}\p{N}_])/giu;
-// `re.findall(r"[a-zA-Z']+", text.lower())` — ASCII letter/apostrophe runs. Kept
+// ASCII letter/apostrophe runs (the input is lowercased before use). Kept
 // distinct from the shared `words`/`latinLowerWords` helpers: this exact class
 // includes the apostrophe, which `latinLowerWords` omits.
 const WORD_TOKEN_RE = /[a-zA-Z']+/g;
-// `re.split(r"[.!?\n]+", text)` — sentence-ish fragments (not the shared
+// Sentence-ish fragments, split on .!? and newlines (not the shared
 // `sentencesOf`, which splits differently).
 const SENTENCE_SPLIT_RE = /[.!?\n]+/;
 
@@ -204,7 +204,7 @@ export function scores(text: string): RegisterScores {
 
   let discourseCount = 0;
   for (const w of wordsList) if (DISCOURSE.has(w)) discourseCount++;
-  // Operation order is fixed for bit-identical float results.
+  // Operation order is fixed so the float arithmetic is deterministic.
   const editorial =
     (discourseCount / n) * 5 +
     (sentences.length >= 4 ? 0.4 : 0) +
@@ -247,8 +247,8 @@ export function runTag(argv: string[]): number {
   for (const line of readLines(src)) {
     const o = JSON.parse(line) as Record<string, unknown>;
     const s = scores(o.text as string);
-    // `max(s, key=s.get)` — first key (technical, informal, editorial) with the
-    // highest value wins ties; only switch on a strictly greater value.
+    // First key (technical, informal, editorial) with the highest value wins
+    // ties; only switch on a strictly greater value.
     let argmaxKey = "technical";
     let argmaxVal = s.technical;
     if (s.informal > argmaxVal) {
@@ -274,7 +274,7 @@ export function runTag(argv: string[]): number {
   let total = 0;
   for (const [, c] of dist.entries()) total += c;
   for (const [reg, c] of dist.mostCommon()) {
-    // `f"{100*c/total:.0f}"` uses round-half-to-even, so route through pyRound.
+    // The percentage uses round-half-to-even, so route through pyRound.
     const pct = String(pyRound((100 * c) / total, 0));
     process.stdout.write(
       `${reg}: ${c} msgs (${pct}%), ${wordDist.get(reg)} words\n`,

@@ -15,11 +15,11 @@ import {
 /**
  * `hyphos rules --test` mirror: every rule is checked against its own declared
  * cases and the whole-pipeline fixtures. This must report zero failures
- * (D-003: deterministic enforcement).
+ * (docs/decisions.md, D-003 — deterministic enforcement).
  */
-describe("rules self-test (D-003 deterministic enforcement)", () => {
+describe("rules self-test (deterministic enforcement, docs/decisions.md D-003)", () => {
   it("passes every rule case and pipeline fixture with 0 failures", () => {
-    // quiet=false would print the summary; pass verbose=false to keep test output clean.
+    // verbose=false keeps the summary out of the test output.
     expect(rulesSelftest(false)).toBe(0);
   });
 
@@ -31,7 +31,7 @@ describe("rules self-test (D-003 deterministic enforcement)", () => {
     expect(nTests).toBe(12);
   });
 
-  it("leaves em-dashes untouched (rewrite family dropped, D-011)", () => {
+  it("leaves em-dashes untouched (no dash rewrites; docs/decisions.md D-011)", () => {
     const [out] = enforce("a — mostly — b");
     expect(out).toBe("a — mostly — b");
   });
@@ -159,7 +159,7 @@ describe("banned words (rule class and per-register list)", () => {
   });
 });
 
-describe("banned tokens (non-word marks — the em-dash surface, D-016)", () => {
+describe("banned tokens (non-word marks — the em-dash surface, docs/decisions.md D-016)", () => {
   // U+2014 EM DASH — the mark that cannot fire under \b, hence the token mode.
   const dashes = { id: "banned-words", kind: "banned" as const, tokens: ["—"] };
 

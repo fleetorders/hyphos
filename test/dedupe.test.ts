@@ -74,9 +74,8 @@ describe("dropNearDuplicates", () => {
   });
 
   it("does NOT delete a short message merely quoted inside a long one", () => {
-    // The bug this rule was rewritten to prevent. Containment scores the short
-    // text 1.0 against the long one; Jaccard does not, because the long text
-    // has far more runs the short one lacks.
+    // Containment would score the short text 1.0 against the long one; Jaccard
+    // does not, because the long text has far more runs the short one lacks.
     const quoted = rec(
       "the timeline that follows from it, which I would like to confirm before " +
         "anything else is committed",
