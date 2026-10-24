@@ -143,13 +143,49 @@ export function backendRefusal(
 // mints a new project folder per call, and they accumulate by the thousand.
 // The directory must stay empty — emptiness is what keeps project
 // instructions out of the rewrite — so stale contents are cleared, not used.
-const CLAUDE_SCRATCH_DIR = path.join(os.tmpdir(), "hyphos-rewrite");
+//
+// The path is per-user as well as fixed. On Linux os.tmpdir() is the shared
+// /tmp: another user could pre-create the guessable name, or a symlink to a
+// folder of theirs, and the backend would then run where they chose — their
+// CLAUDE.md read as project instructions — or the cleanup would fail on
+// files only they can delete and every call would die. macOS and Windows
+// hand every user a private temp directory already; on Linux the per-user
+// runtime directory (/run/user/<uid>, 0700 by the XDG spec) is preferred,
+// with the user's cache directory as the fallback when it is not set (cron,
+// containers).
+function claudeScratchPath(): string {
+  if (process.platform === "darwin" || process.platform === "win32") {
+    return path.join(os.tmpdir(), "hyphos-rewrite");
+  }
+  const runtime = process.env.XDG_RUNTIME_DIR;
+  if (runtime) return path.join(runtime, "hyphos-rewrite");
+  return path.join(
+    process.env.XDG_CACHE_HOME || path.join(os.homedir(), ".cache"),
+    "hyphos-rewrite",
+  );
+}
+
+const CLAUDE_SCRATCH_DIR = claudeScratchPath();
 
 export function claudeScratchDir(): string {
-  fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true });
+  // Refuse the path when it exists but is not a real folder owned by the
+  // current user: a symlink, a stray file, someone else's folder — the
+  // backend would run where someone else chose. Every parent of the path is
+  // owner-only, so an entry that fails this check was put there on purpose.
+  const st = fs.lstatSync(CLAUDE_SCRATCH_DIR, { throwIfNoEntry: false });
+  const uid =
+    typeof process.getuid === "function" ? process.getuid() : undefined;
+  if (st && (!st.isDirectory() || (uid !== undefined && st.uid !== uid))) {
+    throw new Error(
+      "claude backend scratch path is not a folder you own: " +
+        CLAUDE_SCRATCH_DIR +
+        " — remove it (and check what created it), then retry",
+    );
+  }
+  fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true, mode: 0o700 });
   if (fs.readdirSync(CLAUDE_SCRATCH_DIR).length > 0) {
     fs.rmSync(CLAUDE_SCRATCH_DIR, { recursive: true, force: true });
-    fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true });
+    fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true, mode: 0o700 });
   }
   return CLAUDE_SCRATCH_DIR;
 }
