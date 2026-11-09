@@ -1,0 +1,14 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    uses: fleetorders/.github/.github/workflows/fleet-checks.yml@v1
+    with:
+      # The repo's Done bar in the one required context: types clean, suite green.
+      test: npm run typecheck && npm test
+      lint: npm run lint --if-present

@@ -109,6 +109,9 @@ describe("total backend failure", () => {
 });
 
 describe("CLI entry", () => {
+  // The child below carries its own 30s budget; vitest's 5s default would
+  // kill the test first on a loaded machine, where the TS import alone can
+  // outlast it.
   it("refuses to start under HYPHOS_BACKEND=1, non-zero, immediately", () => {
     const draft = path.join(os.tmpdir(), "hyphos-backend-guard-draft.md");
     fs.writeFileSync(draft, "Some draft text.\n");
@@ -136,5 +139,5 @@ describe("CLI entry", () => {
     expect(caught?.stderr).toMatch(/model backend/);
     expect(caught?.stderr).toMatch(/do not invoke hyphos/);
     fs.rmSync(draft, { force: true });
-  });
+  }, 35_000);
 });

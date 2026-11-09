@@ -45,9 +45,11 @@ import { whitespaceSplit } from "../lib/text.js";
 import { Counter } from "../lib/counter.js";
 import { corpusDir } from "../lib/paths.js";
 
-// iconv-lite is not a direct dependency: it is loaded via createRequire as
-// mailparser's transitive dependency (mailparser itself is never imported).
-// It decodes with U+FFFD replacement for undecodable bytes.
+// iconv-lite is declared as a direct dependency: as a nested transitive of
+// mailparser it sat off this module's require path in production installs
+// (--omit=dev), and the CLI died on a missing module. It is loaded via
+// createRequire either way, and decodes with U+FFFD replacement for
+// undecodable bytes.
 const iconv = createRequire(import.meta.url)("iconv-lite") as {
   decode(
     buf: Buffer,
