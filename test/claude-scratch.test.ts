@@ -36,15 +36,26 @@ describe("claudeScratchDir", () => {
   });
 
   it("refuses a scratch path that is not a folder the user owns", () => {
-    const dir = claudeScratchDir();
-    const decoy = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-decoy-"));
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.symlinkSync(decoy, dir);
-    expect(() => claudeScratchDir()).toThrow(/not a folder you own/);
-    // Remove the link (not the decoy) and leave a real scratch directory
-    // behind, so later tests and later runs start clean.
-    fs.rmSync(dir, { force: true });
-    fs.rmSync(decoy, { recursive: true, force: true });
-    expect(claudeScratchDir()).toBe(dir);
+    // Runs against a relocated path (HYPHOS_SCRATCH): planting the symlink at
+    // the real scratch path raced every other caller of it in the same run,
+    // and on Linux the real path is not under the system temp at all.
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-scratch-test-"));
+    const dir = path.join(base, "hyphos-rewrite");
+    process.env.HYPHOS_SCRATCH = dir;
+    try {
+      claudeScratchDir();
+      const decoy = fs.mkdtempSync(path.join(base, "decoy-"));
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.symlinkSync(decoy, dir);
+      expect(() => claudeScratchDir()).toThrow(/not a folder you own/);
+      // Remove the link (not the decoy) and leave a real scratch directory
+      // behind, so the final call sees the guarded path resolve clean again.
+      fs.rmSync(dir, { force: true });
+      fs.rmSync(decoy, { recursive: true, force: true });
+      expect(claudeScratchDir()).toBe(dir);
+    } finally {
+      delete process.env.HYPHOS_SCRATCH;
+      fs.rmSync(base, { recursive: true, force: true });
+    }
   });
 });
