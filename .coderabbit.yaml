@@ -1,7 +1,4 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# CodeRabbit holds a merge on Critical and Major findings only, and approves by itself once
-# those threads are resolved. Lower findings stay comments.
-reviews:
-  auto_approvals:
-    enabled: true
-    min_blocking_severity: major
+# Review policy lives in the organisation-level CodeRabbit settings. A setting
+# in this file REPLACES those wholesale, so the file stays at inheritance only.
+inheritance: true
