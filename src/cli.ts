@@ -23,6 +23,7 @@ import { runExtract } from "./stages/extract.js";
 import { runCurate } from "./stages/curate.js";
 import { runTag } from "./stages/tag.js";
 import { runSalvage } from "./stages/salvage.js";
+import { runReference } from "./stages/reference.js";
 import { runIngestChat } from "./stages/ingestChat.js";
 import { runIngestEmail } from "./stages/ingestEmail.js";
 import { runFingerprint } from "./stages/fingerprint.js";
@@ -136,6 +137,7 @@ stage("tag", runTag);
 stage("ingest-chat", runIngestChat);
 stage("ingest-email", runIngestEmail);
 stage("salvage", runSalvage);
+stage("reference", runReference);
 
 program
   .command("fingerprint")

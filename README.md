@@ -46,6 +46,7 @@ the [roadmap](#roadmap).
 
 ```sh
 npx hyphos extract            # extract your own messages from local transcripts
+npx hyphos reference          # rebuild a pre-agent-era reference corpus, with provenance
 npx hyphos fingerprint        # compute stylometric fingerprints per register
 npx hyphos rules --test       # self-test the deterministic enforcement rules
 ```
