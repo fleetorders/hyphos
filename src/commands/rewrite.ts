@@ -156,10 +156,14 @@ export function backendRefusal(
 function claudeScratchPath(): string {
   // Relocation hook: tests point this at their own folder so they never plant
   // state at the real scratch path other callers in the same run use, and an
-  // operator with a small or non-private temp can do the same. The ownership
-  // guard in claudeScratchDir applies to the override the same way.
+  // operator with a small or non-private temp can do the same. The override
+  // names a PARENT: hyphos creates and clears only the private hyphos-rewrite
+  // child inside it, never the override itself — the directory must be
+  // emptied before every backend call, and an operator's folder is not
+  // hyphos's to empty. The ownership guard in claudeScratchDir applies to the
+  // child the same way.
   const override = process.env.HYPHOS_SCRATCH;
-  if (override) return override;
+  if (override) return path.join(override, "hyphos-rewrite");
   if (process.platform === "darwin" || process.platform === "win32") {
     return path.join(os.tmpdir(), "hyphos-rewrite");
   }

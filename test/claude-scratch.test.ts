@@ -38,10 +38,11 @@ describe("claudeScratchDir", () => {
   it("refuses a scratch path that is not a folder the user owns", () => {
     // Runs against a relocated path (HYPHOS_SCRATCH): planting the symlink at
     // the real scratch path raced every other caller of it in the same run,
-    // and on Linux the real path is not under the system temp at all.
+    // and on Linux the real path is not under the system temp at all. The
+    // override names a parent; the guarded path is its hyphos-rewrite child.
     const base = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-scratch-test-"));
+    process.env.HYPHOS_SCRATCH = base;
     const dir = path.join(base, "hyphos-rewrite");
-    process.env.HYPHOS_SCRATCH = dir;
     try {
       claudeScratchDir();
       const decoy = fs.mkdtempSync(path.join(base, "decoy-"));
@@ -53,6 +54,27 @@ describe("claudeScratchDir", () => {
       fs.rmSync(dir, { force: true });
       fs.rmSync(decoy, { recursive: true, force: true });
       expect(claudeScratchDir()).toBe(dir);
+    } finally {
+      delete process.env.HYPHOS_SCRATCH;
+      fs.rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it("never clears anything but its own child under a relocated parent", () => {
+    // The override names a parent the operator may keep other things in; an
+    // unrelated file beside the scratch child must survive initialization
+    // (and re-initialization), while stale contents inside the child do not.
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), "hyphos-scratch-test-"));
+    fs.writeFileSync(path.join(base, "operators-notes.txt"), "not hyphos's");
+    process.env.HYPHOS_SCRATCH = base;
+    try {
+      const dir = claudeScratchDir();
+      expect(dir).toBe(path.join(base, "hyphos-rewrite"));
+      expect(fs.existsSync(path.join(base, "operators-notes.txt"))).toBe(true);
+      fs.writeFileSync(path.join(dir, "CLAUDE.md"), "stale");
+      claudeScratchDir();
+      expect(fs.readdirSync(dir)).toEqual([]);
+      expect(fs.existsSync(path.join(base, "operators-notes.txt"))).toBe(true);
     } finally {
       delete process.env.HYPHOS_SCRATCH;
       fs.rmSync(base, { recursive: true, force: true });
