@@ -117,4 +117,12 @@ describe("shingles", () => {
   it("is empty for a text shorter than one run", () => {
     expect(shingles("one two three four").size).toBe(0);
   });
+
+  it("keeps Greek words, so Greek compositions compare as text", () => {
+    // Stripping non-Latin scripts made a Greek text normalize to no words:
+    // identical copies compared as two empties and every one of them survived.
+    const runs = shingles("πρέπει να δούμε το θέμα ξανά και να");
+    expect(runs.size).toBeGreaterThan(0);
+    expect(shingles("Πρέπει να δούμε το θέμα ξανά και να")).toEqual(runs);
+  });
 });

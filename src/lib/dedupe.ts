@@ -31,9 +31,13 @@ const LENGTH_RATIO = 0.6;
 
 /** Overlapping five-word runs, the unit of comparison. */
 export function shingles(text: string): Set<string> {
+  // Greek letters participate alongside Latin (the two scripts this engine's
+  // sources write): stripping them, like any other script, made a Greek text
+  // normalize to no words at all, so identical Greek compositions compared as
+  // two empties and every copy survived.
   const w = text
     .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/[^a-z0-9 Ͱ-Ͽἀ-῿]/g, " ")
     .split(/\s+/)
     .filter(Boolean);
   const out = new Set<string>();
