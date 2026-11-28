@@ -154,6 +154,16 @@ export function backendRefusal(
 // with the user's cache directory as the fallback when it is not set (cron,
 // containers).
 function claudeScratchPath(): string {
+  // Relocation hook: tests point this at their own folder so they never plant
+  // state at the real scratch path other callers in the same run use, and an
+  // operator with a small or non-private temp can do the same. The override
+  // names a PARENT: hyphos creates and clears only the private hyphos-rewrite
+  // child inside it, never the override itself — the directory must be
+  // emptied before every backend call, and an operator's folder is not
+  // hyphos's to empty. The ownership guard in claudeScratchDir applies to the
+  // child the same way.
+  const override = process.env.HYPHOS_SCRATCH;
+  if (override) return path.join(override, "hyphos-rewrite");
   if (process.platform === "darwin" || process.platform === "win32") {
     return path.join(os.tmpdir(), "hyphos-rewrite");
   }
@@ -165,29 +175,29 @@ function claudeScratchPath(): string {
   );
 }
 
-const CLAUDE_SCRATCH_DIR = claudeScratchPath();
-
 export function claudeScratchDir(): string {
   // Refuse the path when it exists but is not a real folder owned by the
   // current user: a symlink, a stray file, someone else's folder — the
   // backend would run where someone else chose. Every parent of the path is
   // owner-only, so an entry that fails this check was put there on purpose.
-  const st = fs.lstatSync(CLAUDE_SCRATCH_DIR, { throwIfNoEntry: false });
+  // Resolved per call so an override set between calls takes effect.
+  const scratch = claudeScratchPath();
+  const st = fs.lstatSync(scratch, { throwIfNoEntry: false });
   const uid =
     typeof process.getuid === "function" ? process.getuid() : undefined;
   if (st && (!st.isDirectory() || (uid !== undefined && st.uid !== uid))) {
     throw new Error(
       "claude backend scratch path is not a folder you own: " +
-        CLAUDE_SCRATCH_DIR +
+        scratch +
         " — remove it (and check what created it), then retry",
     );
   }
-  fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true, mode: 0o700 });
-  if (fs.readdirSync(CLAUDE_SCRATCH_DIR).length > 0) {
-    fs.rmSync(CLAUDE_SCRATCH_DIR, { recursive: true, force: true });
-    fs.mkdirSync(CLAUDE_SCRATCH_DIR, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(scratch, { recursive: true, mode: 0o700 });
+  if (fs.readdirSync(scratch).length > 0) {
+    fs.rmSync(scratch, { recursive: true, force: true });
+    fs.mkdirSync(scratch, { recursive: true, mode: 0o700 });
   }
-  return CLAUDE_SCRATCH_DIR;
+  return scratch;
 }
 
 /** Drive the local `claude` CLI as a subprocess (synchronous). */

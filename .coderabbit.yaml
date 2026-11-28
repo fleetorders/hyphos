@@ -1,4 +1,4 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# CodeRabbit leaves comments; it never requests changes.
-reviews:
-  request_changes_workflow: false
+# Review policy lives in the organisation-level CodeRabbit settings. A setting
+# in this file REPLACES those wholesale, so the file stays at inheritance only.
+inheritance: true
