@@ -51,6 +51,12 @@ npx hyphos fingerprint        # compute stylometric fingerprints per register
 npx hyphos rules --test       # self-test the deterministic enforcement rules
 ```
 
+To profile from the reference corpus only — writing that cannot have been
+agent-drafted — point the fingerprint stage at it: the reference output uses
+the `email-` / `chat-` / `tagged` file names the stage reads, so
+`HYPHOS_CORPUS=corpus/reference-pre-agent npx hyphos fingerprint` needs no
+copying.
+
 Before `rewrite` works for a register, write its style guide by hand: copy
 [docs/styleguide-template.md](https://github.com/fleetorders/hyphos/blob/main/docs/styleguide-template.md) to
 `profiles/<register>/styleguide.md` and fill it in. A register without one can
